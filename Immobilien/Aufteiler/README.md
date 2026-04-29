@@ -37,4 +37,11 @@ Zwischen jedem Modul wartet der Orchestrator auf Freigabe (`go`, `weiter`, `ja`,
 
 ## Excel-Handoff
 
-Datei: `0_Aufteiler Skill/Kalkulation_Aufteiler_mit_VK_CF.xlsx` (Vorlage je Objekt kopieren).
+**Vorlage (Master):** [`template/Kalkulation_Aufteiler_mit_VK_CF.xlsx`](template/Kalkulation_Aufteiler_mit_VK_CF.xlsx)
+
+Direkt-Download (Binary, IMMER von GitHub ziehen):
+```
+curl -o Kalkulation_<Strassenkurz>.xlsx https://raw.githubusercontent.com/andre-petrov-creator/claude-prompts/main/Immobilien/Aufteiler/template/Kalkulation_Aufteiler_mit_VK_CF.xlsx
+```
+
+Pro Objekt-Ordner kopieren als `Kalkulation_<Strassenkurz>.xlsx`.
