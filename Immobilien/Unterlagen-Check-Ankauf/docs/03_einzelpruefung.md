@@ -8,14 +8,19 @@ Pro Dokument **ein Subagent** prüft inhaltlich gegen das dokumenttyp-spezifisch
 
 ## Files
 
-- `SKILL.md` — Prüfprotokoll-Templates pro Dokumenttyp + Output-Schema
+- `SKILL.md` — Subagent-Prompt, Output-Schema, Mapping Dokumenttyp → Protokoll-Pfad
+- [`../references/`](../references/) — **Prüflogik pro Dokumenttyp** (20 Protokolle, eines pro Subagent-Aufgabe). Skeleton angelegt, Inhalt wird inkrementell gefüllt
 
 ## Datenfluss
 
 ```
 Inventur (Schritt 1) + ggf. Splits (Schritt 1.5)
   → für jedes Dokument: Task-Tool mit subagent_type=general-purpose
-  → Subagent erhält: Pfad zum File, Dokumenttyp, Output-Schema
+  → Subagent erhält:
+     - Pfad zum File
+     - Dokumenttyp
+     - Pfad zum Prüfprotokoll (references/<NN>-<typ>.md)
+     - Output-Schema (Kerndaten/Befunde/Red Flags/Offene Fragen)
   → parallel ausgeführt
   → Output pro Subagent: Markdown-Block mit
      ## Kerndaten / ## Befunde / ## Red Flags / ## Offene Fragen
@@ -30,4 +35,5 @@ Inventur (Schritt 1) + ggf. Splits (Schritt 1.5)
 
 ## Bekannte Limitierungen
 
-- TODO
+- `references/<NN>-<typ>.md`-Files sind aktuell als Skeleton angelegt, nicht inhaltlich befüllt → Subagents prüfen bis zur Befüllung primär aus LLM-Bauchwissen statt aus strukturiertem Protokoll
+- TODO weitere

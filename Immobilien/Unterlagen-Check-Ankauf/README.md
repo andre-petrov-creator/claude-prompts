@@ -19,6 +19,7 @@ Der Skill wird zur Laufzeit über eine Junction unter `~/.claude/skills/unterlag
 | [`CLAUDE.md`](CLAUDE.md) | Maintenance-Steuerung: Vor-/Nach-Aufgabe-Regeln für Skill-Pflege |
 | [`DEVELOPMENT_GUIDELINES.md`](DEVELOPMENT_GUIDELINES.md) | Konventionen: Workflow-Aufbau, Output-Format, Subagent-Pattern, Tool-Nutzung |
 | [`docs/`](docs/) | Pro Workflow-Schritt eine Doku-Datei (Zweck, Datenfluss, Schnittstellen, Limitierungen) |
+| [`references/`](references/) | **20 Prüfprotokolle**, eines pro Dokumenttyp — Subagent-Anleitung für Schritt 2 (aktuell Skeleton, Inhalt wird inkrementell gefüllt) |
 | [`tools/pdf_split.py`](tools/pdf_split.py) | Splittet PDFs > 25 MB in Subagent-Häppchen |
 | [`tools/report_to_pdf.py`](tools/report_to_pdf.py) | Konvertiert Markdown-Report nach PDF (Layout-Regeln R1–R13) |
 
