@@ -13,11 +13,23 @@ Der Skill wird zur Laufzeit über eine Junction unter `~/.claude/skills/unterlag
 
 ## Inhalt
 
-| Datei | Zweck |
+| Datei / Ordner | Zweck |
 |---|---|
-| [`SKILL.md`](SKILL.md) | Skill-Definition (Frontmatter + 6-Schritte-Workflow inkl. Parallel-Subagents) |
+| [`SKILL.md`](SKILL.md) | Skill-Definition (Frontmatter + 6-Schritte-Workflow inkl. Parallel-Subagents) — **Master, vor Änderung CLAUDE.md + docs/ lesen** |
+| [`CLAUDE.md`](CLAUDE.md) | Maintenance-Steuerung: Vor-/Nach-Aufgabe-Regeln für Skill-Pflege |
+| [`DEVELOPMENT_GUIDELINES.md`](DEVELOPMENT_GUIDELINES.md) | Konventionen: Workflow-Aufbau, Output-Format, Subagent-Pattern, Tool-Nutzung |
+| [`docs/`](docs/) | Pro Workflow-Schritt eine Doku-Datei (Zweck, Datenfluss, Schnittstellen, Limitierungen) |
 | [`tools/pdf_split.py`](tools/pdf_split.py) | Splittet PDFs > 25 MB in Subagent-Häppchen |
 | [`tools/report_to_pdf.py`](tools/report_to_pdf.py) | Konvertiert Markdown-Report nach PDF (Layout-Regeln R1–R13) |
+
+## Pflege-Workflow
+
+Wenn am Skill **gearbeitet** wird (nicht: wenn er ausgeführt wird):
+
+1. [`CLAUDE.md`](CLAUDE.md) + relevante [`docs/`](docs/) lesen
+2. Änderung in SKILL.md / tools/ machen
+3. Betroffene `docs/<schritt>.md` aktualisieren
+4. Commit + Push
 
 ## Junction neu anlegen (nach Recovery / Rechnerwechsel)
 
