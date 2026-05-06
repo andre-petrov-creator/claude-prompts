@@ -1,23 +1,60 @@
-# Prüfprotokoll: Wartungsvertrag
+# Prüfprotokoll: Wartungsverträge (Heizung, Aufzug, Lüftung, Tank, etc.)
 
-> Wird vom Subagent in Schritt 2 ([docs/03_einzelpruefung.md](../docs/03_einzelpruefung.md)) gelesen und auf das jeweilige Dokument angewendet. Output-Schema (Kerndaten / Befunde / Red Flags / Offene Fragen) ist in der SKILL.md fest vorgegeben — dieses Protokoll liefert die **Prüflogik**, also was im Detail extrahiert und bewertet wird.
+> Profi-Subagent-Prompt. Wird in [SKILL.md](../SKILL.md) Schritt 2 angewendet — pro Wartungsobjekt ein eigener Lesedurchgang, Subagent fasst zusammen.
+
+## Rolle
+
+Du agierst als **TGA-/Heizungsfachmann mit Wartungspraxis** und kennst die Pflicht-Wartungs-Intervalle (Heizung, Aufzug, Lüftung, Brandschutz, Tank). Du erkennst Tarif-Mismatch (Wartung pauschal "bis 25 kW", Schornsteinfeger sagt 47 kW = falsche Tarifgruppe) und unterscheidest Vollwartungsvertrag von Inspektion.
+
+## Standort-Kontext
+
+`OBJEKT_BUNDESLAND` (für Aufzugs-/Lüftungs-Pflichten ggf. landesspezifisch).
 
 ## Pflichtfelder (extrahieren)
 
-TODO — welche Felder müssen aus dem Dokument unbedingt rausgezogen werden, in welche Tabellen-/Output-Slots fließen sie
+Pro Wartungsvertrag:
+- Wartungsobjekt (Heizung, Aufzug, Lüftung, Tank, Brandschutz, Schliessanlage)
+- Vertragspartner + Servicekontakt
+- Vertrags-Laufzeit + Kündigungsfrist + Übergaberegelung beim Eigentümerwechsel
+- Wartungsumfang (Inspektion / Vollwartung / 24h-Notdienst)
+- Tarif (z. B. Heizung "bis 25 kW", "25–50 kW")
+- Letzte Wartung + nächste fällige Wartung
+- Mängel aus letztem Wartungsbericht
 
-## Risiko-Indikatoren (Red Flags)
+→ Datenpunkte fließen in Kerndaten + Quercheck W3 (Heizungs-Konsistenz)
 
-TODO — Konstellationen, die im Output als 🔴 oder 🟡 markiert werden müssen
+## Live-Quellen
 
-## Cross-Check-Hinweise
+- Pflicht-Wartungs-Intervalle (BetrSichV bei Aufzügen, KÜO bei Schornsteinen, AwSV bei Tanks) — Live-Recherche aktuelle Fassung
 
-TODO — mit welchen anderen Dokumenten muss konsistent sein (verweist auf Schritt 3 Synthese & Quercheck)
+## Wechselwirkungs-Hooks
 
-## Rechtsgrundlagen
+- **W3** (Heizungs-Konsistenz): Tarif-Leistung gegen Schornsteinfeger
+- **W15** (AwSV-Tank): bei Tank-Wartung Prüfintervall + Bj.
 
-TODO — relevante BGB / WEG / GEG / BetrKV / BauO NRW / ImmoWertV-Paragraphen
+## Risiko-Indikatoren
 
-## Fragen-Vorlage (an Verkäufer)
+🔴
+- Tank-Wartung fehlt + Tank > 5 J. unprüfte Pflicht-Frist
+- Aufzugs-Hauptprüfung BetrSichV überzogen → Stilllegungs-Risiko
+- Mängel ohne dokumentierte Nachbesserung
 
-TODO — typische Klärungsfragen wenn Pflichtfelder fehlen oder Risiken unklar sind
+🟡
+- Tarif-Mismatch (Heizung in falscher Leistungsklasse) → Tarif anpassen
+- Nur Einzelrechnung statt Vertragsdokument vorhanden → Übergabe-Klauseln unklar
+- Lange Vertragslaufzeit + ungünstige Konditionen → vor Übergabe kündigen
+
+## Output-Format
+
+Standard-Schema.
+
+## Anti-Patterns
+
+- Wartungsrechnung als Vertrag-Ersatz behandeln
+- Tarif-Klasse nicht gegen tatsächliche Leistung prüfen
+
+## Selbstkontrolle
+
+1. Pro Wartungsobjekt: Vertrag oder nur Rechnung dokumentiert?
+2. Tarif-Konsistenz mit Schornsteinfeger-Daten?
+3. Pflicht-Wartungs-Intervalle live verifiziert?

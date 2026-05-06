@@ -51,7 +51,17 @@ except ImportError:
     sys.exit(1)
 
 
-# CSS fuer Ampel-Layout, kompakt, nicht aufgeblaeht
+# CSS fuer Ampel-Layout + saubere Seitenumbrueche
+#
+# Umbruch-Regeln (Iteration 01):
+# - Bloecke (Tabellen, Detail-Sektionen, To-Do-Buckets, Red-Flag-Eintraege,
+#   Quercheck-Tabellen) werden NICHT mitten durch geteilt.
+# - Mehrere kurze Bloecke duerfen sich eine Seite teilen.
+# - Lange Bloecke duerfen ueber mehrere Seiten gehen, brechen aber an
+#   sauberen Nahtstellen (Tabellenzeile, Bullet, Absatz).
+# - Verbot: halber Block am Seitenende + Rest auf Folgeseite.
+# - h2/h3 bleiben mit ihrem Folgeinhalt zusammen (page-break-after: avoid).
+# - Orphans/Widows >=2: keine alleinstehenden Zeilen am Seitenanfang/-ende.
 CSS = """
 @page {
   size: A4;
@@ -63,12 +73,16 @@ body {
   line-height: 1.4;
   color: #1a1a1a;
   margin: 0;
+  orphans: 2;
+  widows: 2;
 }
 h1 {
   font-size: 16pt;
   border-bottom: 2px solid #333;
   padding-bottom: 6px;
   margin: 0 0 12px 0;
+  page-break-after: avoid;
+  break-after: avoid-page;
 }
 h2 {
   font-size: 12pt;
@@ -76,6 +90,8 @@ h2 {
   padding: 4px 8px;
   background: #f0f0f0;
   border-left: 4px solid #555;
+  page-break-after: avoid;
+  break-after: avoid-page;
 }
 h2.rot    { background: #fde2e2; border-left-color: #c62828; color: #8b0000; }
 h2.gelb   { background: #fff4d6; border-left-color: #f9a825; color: #6b4500; }
@@ -84,14 +100,31 @@ h2.gruen  { background: #e1f5e2; border-left-color: #2e7d32; color: #1b4d1f; }
 h3 {
   font-size: 11pt;
   margin: 12px 0 4px 0;
+  page-break-after: avoid;
+  break-after: avoid-page;
 }
-p, li { margin: 3px 0; }
+p, li {
+  margin: 3px 0;
+  orphans: 2;
+  widows: 2;
+}
 ul, ol { padding-left: 22px; margin: 4px 0; }
+
+/* Tabellen: nicht mitten durchbrechen, falls sie auf eine Seite passen.
+   Wenn zu lang: tbody-Zeilen brechen sauber, thead bleibt erhalten. */
 table {
   border-collapse: collapse;
   width: 100%;
   font-size: 9pt;
   margin: 6px 0;
+  page-break-inside: avoid;
+  break-inside: avoid-page;
+}
+thead { display: table-header-group; }
+tbody { page-break-inside: auto; }
+tr {
+  page-break-inside: avoid;
+  break-inside: avoid-page;
 }
 th, td {
   border: 1px solid #bbb;
@@ -101,15 +134,26 @@ th, td {
 }
 th { background: #eaeaea; font-weight: 600; }
 
+/* To-Do-Buckets: als atomarer Block behandeln, falls passend.
+   Bei sehr vielen To-Dos kann der Block trotzdem brechen, dann an Bullet-
+   Grenze (li mit page-break-inside: avoid). */
 .todo-rot, .todo-gelb, .todo-gruen {
   padding: 8px 10px;
   margin: 6px 0;
   border-left: 4px solid;
   border-radius: 2px;
+  page-break-inside: avoid;
+  break-inside: avoid-page;
 }
 .todo-rot   { background: #fde2e2; border-color: #c62828; }
 .todo-gelb  { background: #fff4d6; border-color: #f9a825; }
 .todo-gruen { background: #e1f5e2; border-color: #2e7d32; }
+
+/* Bullet-Items NICHT trennen (verhindert halbe Listenpunkte). */
+li {
+  page-break-inside: avoid;
+  break-inside: avoid-page;
+}
 
 .quelle {
   font-size: 8.5pt;

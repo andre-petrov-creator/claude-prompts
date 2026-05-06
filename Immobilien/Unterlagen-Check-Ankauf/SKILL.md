@@ -1,19 +1,24 @@
 ---
 name: unterlagen-check-ankauf
-description: Use this skill whenever the user wants a professional document review of a German multi-family property (Mehrfamilienhaus, MFH) acquisition package. Triggers include "Unterlagen prüfen", "Unterlagencheck", "Bankenpaket", "Datenraum", "Due Diligence", "Ankaufsprüfung", "Exposé prüfen", or whenever the user shares folders with documents like Grundbuchauszug, Mietverträge, Energieausweis, Teilungserklärung, Betriebskostenabrechnung, Versicherungspolice, Baugenehmigung, Flurkarte, Baulastenverzeichnis, Wohnflächenberechnung, Wartungsvertrag, Hausgeldabrechnung. Performs document-by-document analysis with PARALLEL subagents (one per document via Task tool) for speed, then synthesizes results, runs cross-document checks, applies Aufteiler-specific risk analysis (NRW/Ruhrgebiet), produces structured red-flag report with Risk-Score, and exports as PDF. Always use this skill for systematic package reviews even if user does not explicitly say "Due Diligence". Do NOT use for single-question queries about one fact in one document.
+description: Use this skill whenever the user wants a professional document review of a German multi-family property (Mehrfamilienhaus, MFH) acquisition package. Triggers include "Unterlagen prüfen", "Unterlagencheck", "Bankenpaket", "Datenraum", "Due Diligence", "Ankaufsprüfung", "Exposé prüfen", or whenever the user shares folders with documents like Grundbuchauszug, Mietverträge, Energieausweis, Teilungserklärung, Betriebskostenabrechnung, Versicherungspolice, Baugenehmigung, Flurkarte, Baulastenverzeichnis, Wohnflächenberechnung, Wartungsvertrag, Hausgeldabrechnung. Performs document-by-document analysis with PARALLEL Profi-Subagents (one per document via Task tool, each is a domain expert defined in references/NN-*.md), runs cross-document checks via the Wechselwirkungs-Matrix, applies Aufteiler-Risk-Analysis with live-researched local rules, runs an Wirtschafts-Subagent for cashflow/CapEx/Rücklagen-Validation, produces a structured Red-Flag-Report with Risk-Score (0–100) and exports as PDF. Always location-agnostic — every legal/regulatory fact is fetched live for the actual `OBJEKT_GEMEINDE` and `OBJEKT_BUNDESLAND`. Always use this skill for systematic package reviews even if user does not explicitly say "Due Diligence". Do NOT use for single-question queries about one fact in one document.
 ---
 
-# Unterlagen-Check Ankauf (MFH Due Diligence, Parallel)
+# Unterlagen-Check Ankauf (MFH Due Diligence, Profi-Subagents parallel)
 
 ## Mission
 
-Komplettes Unterlagenpaket eines MFH systematisch prüfen, jedes Dokument einzeln und im Gesamtkontext. Versteckte Risiken aufdecken, die im Exposé nie stehen, im Kaufvertrag aber bindend werden. Output ist ein Red-Flag-Report aus Investoren- und Bankensicht, mit klarer Deal-Empfehlung, als Markdown und als PDF.
+Komplettes Unterlagenpaket eines MFH systematisch prüfen, jedes Dokument einzeln und im Gesamtkontext. Versteckte Risiken aufdecken, die im Exposé nie stehen, im Kaufvertrag aber bindend werden. Output ist ein Red-Flag-Report aus Investoren- und Bankensicht, mit klarer Deal-Empfehlung und Risk-Score, als Markdown und als PDF.
 
-**Kernidee dieser Version**: Einzelprüfung läuft parallel über Subagents (Task-Tool). Bei 15 Dokumenten dauert die Einzelprüfung dadurch nicht 15x so lange wie eines, sondern annähernd so lange wie das langsamste.
+**Architektur**:
 
-## Rolle
+- **Pro Unterlagengruppe ein Profi-Subagent** (z. B. Mietrechts-Anwalt für Mietvertrag, Energieberater für Energieausweis), Definition jeweils in `references/NN-*.md`.
+- **Subagents laufen parallel** in Schritt 2 — bei 15 Unterlagen dauert die Einzelprüfung nicht 15× so lange, sondern annähernd so lange wie das langsamste Dokument.
+- **Hauptagent trägt zusammen**, wendet die Wechselwirkungs-Matrix (`references/quercheck-matrix.md`) an, ruft den Wirtschafts-Subagent (`references/wirtschaftliche-validierung.md`) auf, baut den Gesamtreport.
+- **Standort-agnostisch**: Alle Rechtszitate, kommunalen Regelungen und Marktbenchmarks werden live recherchiert — kein Stadt-/Bundesland-Hardcoding.
 
-Erfahrener MFH-Investor mit 15+ Jahren DACH-Erfahrung, Schwerpunkt NRW/Ruhrgebiet, Aufteiler-Strategie. Kennt BGB-Mietrecht, WEG-Recht, GEG, BetrKV, BauO NRW, ImmoWertV. Denkt gleichzeitig wie ein Bankprüfer, der das Objekt finanzieren muss.
+## Rolle (Hauptagent)
+
+Erfahrener MFH-Investor mit DACH-Praxis und Aufteiler-Strategie. Kennt BGB-Mietrecht, WEG-Recht, GEG, BetrKV, ImmoWertV. Denkt gleichzeitig wie ein Bankprüfer, der das Objekt finanzieren muss.
 
 Maxime: Die teuersten Fehler stehen in den Unterlagen, nicht im Exposé. Jedes Dokument wird gelesen wie der Verkäufer es nicht möchte.
 
@@ -23,33 +28,53 @@ Maxime: Die teuersten Fehler stehen in den Unterlagen, nicht im Exposé. Jedes D
 - **Confirmation Bias**: Wenn der Deal "gut aussieht", aktiv nach Gegenargumenten suchen. Mindestens drei Risiken benennen.
 - **Curse of Knowledge**: Fachbegriffe in Klartext erklären, wenn sie zentral für eine Empfehlung sind.
 - **Overconfidence**: Bei rechtlichen Detailfragen explizit "muss Anwalt prüfen" sagen, statt eigene Auslegung als sicher zu verkaufen.
+- **Anchoring auf Exposé-Zahlen**: Anzeige-/Exposé-Renditen als Anker ignorieren, eigene Cashflow-Rechnung priorisieren.
 
 ---
 
 ## Workflow
 
-Sechs Schritte. Schritt 2 läuft parallel.
+Sieben Schritte. Schritt 2 läuft parallel.
 
-### Schritt 1: Inventur (sequentiell)
+### Schritt 1: Inventur + Standort-Live-Recherche (sequentiell)
 
 Bevor irgendein Dokument inhaltlich geprüft wird:
 
 1. Vom Nutzer den Pfad zum Unterlagen-Ordner erfragen oder aus dem Kontext entnehmen.
-2. Ordnerinhalt auflisten (Bash `ls`, `find`).
-3. **Dateigrößen prüfen** (`ls -la` oder `stat`). Jede PDF > 25 MB markieren als "Split nötig".
-4. Jede Datei einem Dokumenttyp zuordnen (siehe Mapping unten).
-5. Soll-Ist-Vergleich erstellen.
-6. Inventur-Tabelle ausgeben:
+2. Ordnerinhalt auflisten, Dateigrößen prüfen — jede PDF > 25 MB markieren als "Split nötig".
+3. Jede Datei einem Dokumenttyp zuordnen (siehe Mapping unten).
+4. Standort-Variablen aus Grundbuch / Adresse / Exposé extrahieren:
+   - `OBJEKT_ADRESSE`
+   - `OBJEKT_GEMEINDE`
+   - `OBJEKT_KREIS`
+   - `OBJEKT_BUNDESLAND`
+5. **Standort-Live-Recherche** (zentral, einmalig — Ergebnisse werden allen Subagents als Kontext mitgegeben):
+   - **BORIS-Portal** des `OBJEKT_BUNDESLAND` für Bodenrichtwert (URL live recherchieren — jedes Bundesland hat eigenes Portal)
+   - **Mietspiegel** `OBJEKT_GEMEINDE` (qualifiziert / einfach / nicht vorhanden)
+   - **Kappungsgrenzenverordnung** `OBJEKT_BUNDESLAND` § 558 Abs. 3 BGB (15 % oder 20 % in 3 J. + Geltungsbereich)
+   - **Kündigungssperrfristverordnung** `OBJEKT_BUNDESLAND` § 577a BGB (Dauer + Geltungsbereich)
+   - **Mietpreisbremse** § 556d BGB — gilt im `OBJEKT_GEMEINDE`?
+   - **Kommunale Wärmeplanung** `OBJEKT_GEMEINDE` (Stichtag § 71 GEG)
+   - **Soziale Erhaltungssatzung / Milieuschutz** `OBJEKT_GEMEINDE` Stadtteil-genau
+   - **Hebesatz Grundsteuer** `OBJEKT_GEMEINDE`
+   - **DMB-BetrKV-Spiegel** aktueller Stand (bundesweiter Benchmark NK warm)
+   - Rechercheergebnisse mit URL + Stand-Datum dokumentieren. Bei nicht ermittelbar: explizit `nicht_pruefbar`.
+6. Vom User zusätzliche Inputs erfragen (sofern nicht schon im Kontext):
+   - **Kaufpreis** EUR
+   - **Exposé/Verkaufsanzeige** (für Anzeigen-vs-Realität-Vergleich) — falls nicht vorhanden, als `nicht angegeben` weiterführen
+   - **Bestand Instandhaltungs-Rücklage** (Hausgeldkonto-Bestand) — falls nicht vorhanden, als `nicht angegeben`
+   - **Aufteiler-Strategie?** (ja/nein) — wenn ja, Schritt 4 + 4.5 mit Aufteiler-Spezifika
+7. Soll-Ist-Vergleich Inventur ausgeben — **alle 20 Soll-Positionen** mit Status, auch n/a:
 
 | Nr | Dokumenttyp | Datei | Größe | Status |
 |---|---|---|---|---|
-| 01 | Grundbuchauszug | `grundbuch_2024.pdf` | 1.2 MB | ✅ Vorhanden |
+| 01 | Grundbuchauszug | `grundbuch_2026.pdf` | 1.2 MB | ✅ Vorhanden |
 | 02 | Flurkarte | — | — | ❌ Fehlt |
-| 12 | Bauakte | `bauakte.pdf` | 22 MB | ⚠️ Split nötig |
+| ... | ... | ... | ... | ... |
 
-**Mapping Dokumenttyp → Prüfprotokoll-Datei**:
+**Mapping Dokumenttyp → Profi-Subagent-Reference**:
 
-| Nr | Typ | Protokoll |
+| Nr | Typ | Profi-Reference |
 |---|---|---|
 | 01 | Grundbuchauszug | `references/01-grundbuch.md` |
 | 02 | Flurkarte / Liegenschaftskarte | `references/02-flurkarte.md` |
@@ -70,11 +95,15 @@ Bevor irgendein Dokument inhaltlich geprüft wird:
 | 17 | Teilungserklärung | `references/17-teilungserklaerung.md` |
 | 18 | EV-Protokoll (WEG) | `references/18-ev-protokolle.md` |
 | 19 | Wirtschaftsplan / Hausgeldabrechnung | `references/19-wirtschaftsplan.md` |
-| 20 | Grundsteuerbescheid | `references/20-grundsteuer.md` |
+| 20 | Grundsteuerbescheid + Erschließungsbeiträge | `references/20-grundsteuer.md` |
 
-**Mietverträge**: Wenn mehrere Wohneinheiten, gibt es typischerweise einen Mietvertrag pro WE. Jeder Vertrag bekommt einen eigenen Subagent.
+**Mietverträge**: Wenn mehrere Wohneinheiten, gibt es typischerweise einen Mietvertrag pro WE. Jeder Vertrag bekommt einen eigenen Subagent (Mietrechts-Anwalt aus `06-mietvertrag.md`).
 
-**Abbruch-Regel**: Wenn weniger als 60 Prozent der Soll-Liste vorhanden, Stopp und Rückfrage an Nutzer: trotzdem prüfen oder Verkäufer erst nachliefern lassen?
+**Fallback bei unbekanntem Doc-Typ**: Wenn die Inventur einen Dokument-Typ findet, der KEIN Mapping hat → generischer Subagent läuft (mit Hinweis "kein Profi-Profil"), Hauptagent vermerkt im finalen Report:
+
+> **Kein Profi-Subagent vorhanden für Dokumenttyp: <TYP>.** Datei wurde mit generischem Prompt geprüft, Tiefe eingeschränkt. **Empfehlung**: `references/NN-<typ>.md` als neue Profi-Reference anlegen (Iteration 02).
+
+**Abbruch-Regel**: Wenn weniger als 60 % der Soll-Liste vorhanden, Stopp und Rückfrage an Nutzer: trotzdem prüfen oder Verkäufer erst nachliefern lassen?
 
 ---
 
@@ -82,10 +111,10 @@ Bevor irgendein Dokument inhaltlich geprüft wird:
 
 Wenn in der Inventur PDFs mit "Split nötig" markiert wurden (typisch >25 MB, vor allem Bauakten), VOR dem Subagent-Spawn splitten.
 
-**Tool**: `~/.claude/skills/unterlagen-check-ankauf/tools/pdf_split.py`
+**Tool**: `tools/pdf_split.py`
 
 ```bash
-python ~/.claude/skills/unterlagen-check-ankauf/tools/pdf_split.py "/pfad/zur/grossen.pdf"
+python tools/pdf_split.py "/pfad/zur/grossen.pdf"
 ```
 
 **Effekt**: Erzeugt Geschwister-Ordner `_split_<dateiname>/` mit `part_001.pdf`, `part_002.pdf`, ... und `_manifest.json`. Jeder Chunk ≤ 25 MB.
@@ -96,82 +125,80 @@ python ~/.claude/skills/unterlagen-check-ankauf/tools/pdf_split.py "/pfad/zur/gr
 
 ---
 
-### Schritt 2: Parallele Einzelprüfung (Subagents)
+### Schritt 2: Parallele Profi-Subagent-Einzelprüfung
 
-Für jede vorhandene Datei einen Subagent via Task-Tool spawnen. **Mehrere Task-Calls in einer einzigen Antwort starten parallel.** Das ist der zentrale Performance-Hebel.
+Für jede vorhandene Datei einen Profi-Subagent via Task-Tool spawnen. **Mehrere Task-Calls in einer einzigen Antwort starten parallel.** Das ist der zentrale Performance-Hebel.
 
 **Subagent-Prompt-Template** (für jeden Task-Call individuell befüllen):
 
 ```
-Du bist ein erfahrener MFH-Investor und prüfst genau ein Dokument 
-aus einem Ankaufspaket.
+Du bist ein Profi-Subagent für genau einen Dokumenttyp eines MFH-Ankaufspakets.
 
-Dokumenttyp: {DOKUMENTTYP}
-Datei: {DATEIPFAD}
-Prüfprotokoll: {PROTOKOLL_PFAD}
+PROFI-PROTOKOLL: {PROTOKOLL_PFAD}
+   → Lies dieses Protokoll vollständig. Es definiert deine Rolle, Pflichtfelder,
+     Live-Quellen, Wechselwirkungs-Hooks und Risiko-Indikatoren.
 
-Falls die Datei gesplittet wurde:
-Original-Datei: {ORIGINAL_PFAD}
-Split-Ordner: {SPLIT_ORDNER}
-Manifest: {SPLIT_ORDNER}/_manifest.json
-=> Lies die parts der Reihe nach, nutze _manifest.json fuer 
-Originalseiten-Mapping.
+DOKUMENT: {DATEIPFAD}
+   → Bei gesplitteten Files: Original-Datei {ORIGINAL_PFAD},
+     Split-Ordner {SPLIT_ORDNER}, Manifest {SPLIT_ORDNER}/_manifest.json.
+     Lies parts der Reihe nach, nutze Manifest fuer Originalseiten-Mapping.
 
-Auftrag:
-1. Lies das Prüfprotokoll {PROTOKOLL_PFAD} vollständig.
-2. Lies die Datei {DATEIPFAD} vollständig (bei gesplitteten Files: 
-   alle parts).
-3. Wende das Prüfprotokoll auf die Datei an.
-4. Bei jedem konkreten Befund und jeder Red Flag: Quelle angeben mit
-   - Original-Dateiname
-   - Originalseiten-Nummer
-   im Format: [datei.pdf, S. 12]
-5. Antworte AUSSCHLIESSLICH im folgenden Schema (kein Vorwort, 
-   kein Abschluss, kein Markdown-Codeblock drumherum):
+STANDORT-KONTEXT (aus Schritt 1, zentrale Live-Recherche):
+{STANDORT_BLOCK}
+   Enthaelt: OBJEKT_ADRESSE, OBJEKT_GEMEINDE, OBJEKT_KREIS, OBJEKT_BUNDESLAND
+   und alle live recherchierten Variablen (BRW-Portal, Mietspiegel,
+   Sperrfrist, Kappungsgrenze, Mietpreisbremse, Waermeplanung,
+   Erhaltungssatzung, Hebesatz, BetrKV-Spiegel) mit URL + Stand.
+
+AUFTRAG:
+1. Profi-Protokoll vollstaendig anwenden.
+2. Bei jedem Rechtszitat: Live-URL + Datum aus Standort-Block beziehen,
+   sonst Status "nicht_pruefbar".
+3. Bei jedem konkreten Befund und jeder Red Flag: Quelle als
+   [datei.pdf, S. X] anhaengen.
+4. Wechselwirkungs-Datenpunkte fuer Quercheck-Matrix klar markieren
+   (siehe Hooks im Profi-Protokoll).
+5. Antworte AUSSCHLIESSLICH im folgenden Schema:
 
 ---
 dokument: "{DOKUMENTTYP}"
 datei: "{ORIGINAL_PFAD oder DATEIPFAD}"
 status: "vollstaendig" | "unvollstaendig" | "nicht_pruefbar"
+profi_profil: "vorhanden" | "fallback_generisch"
 ---
 
 ## Kerndaten
-[Liste relevanter Datenpunkte für späteren Quercheck. Beispiele: 
-Wohnfläche gesamt, Wohnfläche pro WE, Baujahr, Eigentümer, 
-Heizungstyp, Ist-Mieten, Kautionen, Versicherungswert. Nur 
-Datenpunkte, die im Dokument tatsächlich stehen. Bei jedem 
-Datenpunkt: [datei.pdf, S. X] anhängen.]
+[Datenpunkte fuer Cross-Doc-Quercheck. Pro Datenpunkt:
+ [datei.pdf, S. X] anhaengen. Quercheck-Hook-Zeilen markieren mit
+ "→ W<Nr>".]
 
 ## Befunde
-[Bullet-List, was im Dokument steht und für die Bewertung relevant 
-ist. Bei jedem Befund: [datei.pdf, S. X] anhängen.]
+[Bullet-List, max. 5-8 Punkte. Quelle zwingend.]
 
 ## Red Flags
-🔴 [Hohes Risiko, konkretes Detail mit Begründung] [datei.pdf, S. X]
-🟡 [Mittleres Risiko, konkretes Detail mit Begründung] [datei.pdf, S. X]
+🔴 [Hohes Risiko, konkretes Detail mit Begruendung] [datei.pdf, S. X]
+🟡 [Mittleres Risiko, konkretes Detail mit Begruendung] [datei.pdf, S. X]
+(Nur tatsaechlich vorhandene Red Flags. Keine Erfindungen. Wenn keine,
+ schreib "Keine.")
 
-(Nur tatsächlich vorhandene Red Flags. Keine Erfindungen. Wenn 
-keine, schreib "Keine.")
-
-## Offene Fragen an Verkäufer
+## Offene Fragen an Verkaeufer
 - [Konkrete Frage 1]
 - [Konkrete Frage 2]
 
-Constraints:
+CONSTRAINTS:
 - Keine Spekulation. Bei Unsicherheit Status "nicht_pruefbar".
-- Beträge in Euro. Keine Gedankenstriche, stattdessen Komma 
-  oder Punkt.
-- Bei rechtlichen Detailfragen Hinweis "muss von Anwalt geprüft 
-  werden" anfügen.
+- Betraege in Euro. Keine Gedankenstriche, stattdessen Komma oder Punkt.
+- Bei rechtlichen Detailfragen Hinweis "muss von Anwalt geprueft werden".
 - Antworte auf Deutsch.
-- Quellenverweise als [datei.pdf, S. X] sind PFLICHT bei jedem 
-  Befund und jeder Red Flag. Ohne Quelle ist die Aussage nicht 
-  verwertbar.
+- Quellenverweise als [datei.pdf, S. X] sind PFLICHT bei jedem Befund
+  und jeder Red Flag.
+- Bei Doc-Typ ohne Profi-Reference (Fallback): profi_profil="fallback_generisch"
+  setzen, Hauptagent baut daraus den "kein Profi-Subagent"-Hinweis.
 ```
 
 **Parallelisierung**: Alle Task-Calls in einer einzigen Antwort. Beispiel: 15 vorhandene Dokumente = 15 Task-Tool-Aufrufe in einer Response. Claude Code führt diese parallel aus.
 
-**Wenn die Anzahl Subagents groß wird (über 20)**: In Batches von max. 20 parallel laufen lassen, sonst können Token-Limits oder Rate-Limits stören.
+**Bei sehr großer Anzahl (>20)**: in Batches von max. 20 parallel laufen lassen, sonst können Token-/Rate-Limits stören.
 
 ---
 
@@ -179,181 +206,118 @@ Constraints:
 
 Hauptagent sammelt alle Subagent-Outputs. Dann:
 
-1. **Datenpunkte extrahieren**: Aus allen "Kerndaten"-Sektionen die Werte für die Quercheck-Matrix ziehen.
-2. **Quercheck-Matrix anwenden** (siehe `references/quercheck-matrix.md`):
-   - Wohnfläche: Summe pro Quelle vergleichen
-   - Mieten: Vertrag vs. Mieterliste vs. BK-Vorauszahlungen
-   - Baujahr: Energieausweis vs. Bauakte vs. Exposé
-   - Heizungssystem: Energieausweis vs. Heizkostenabrechnung vs. Wartungsvertrag
-   - Eigentümer: Grundbuch vs. Verkäufer
-   - Wegerechte: Grundbuch vs. Flurkarte
-   - Stellplätze: Bauakte vs. Baulasten
+1. **Datenpunkte sammeln**: aus allen "Kerndaten"-Sektionen die mit `→ W<Nr>` markierten Werte in eine flache Liste extrahieren.
+2. **Wechselwirkungs-Matrix anwenden**: Zeile für Zeile aus `references/quercheck-matrix.md` durchgehen — pro Zeile prüfen, ob die geforderten Quellen-Datenpunkte vorhanden sind und ob sie konsistent sind.
+3. **Quercheck-Tabelle ausgeben**:
 
-3. **Inkonsistenzen rot markieren**, mit Detailangabe welche Quellen abweichen und um wie viel.
+| Datenpunkt | Quelle 1 | Quelle 2 | Quelle 3 | Konsistent? | Hinweis | Fix |
+|---|---|---|---|---|---|---|
+| ... | ... | ... | ... | ✅ / ⚠️ / 🔴 | ... | ... |
 
-4. **Quercheck-Tabelle ausgeben**:
-
-| Datenpunkt | Quelle 1 | Quelle 2 | Quelle 3 | Konsistent? | Hinweis |
-|---|---|---|---|---|---|
-| Wohnfläche gesamt | 412 m² (Wohnflächenberechnung) | 405 m² (Energieausweis) | 412 m² (Exposé) | ⚠️ | Energieausweis weicht um 1.7% ab, prüfen |
+4. **Inkonsistenzen rot markieren**, mit Detailangabe welche Quellen abweichen und um wie viel.
 
 ---
 
-### Schritt 4: Aufteiler-Risiken (falls Strategie aktiv)
+### Schritt 4: Aufteiler-Risiken (bedingt — nur bei Aufteiler-Strategie)
 
-Wenn der Nutzer Aufteiler-Strategie verfolgt (Standard bei diesem Skill-Nutzer): `references/aufteiler-risiken.md` anwenden. Tabelle erstellen pro Mieter:
+Wenn der Nutzer Aufteiler-Strategie verfolgt: `references/aufteiler-risiken.md` anwenden.
 
-| Mieter | Mietbeginn | Alter (falls bekannt) | Soziale Härte | Vorkaufsrecht § 577 | Sperrfrist § 577a | Risiko-Stufe |
+1. Standort-Live-Variablen aus Schritt 1 nutzen (Sperrfrist, Kappung, Mietpreisbremse, Erhaltungssatzung).
+2. Risiko-Matrix pro Mietverhältnis erstellen (siehe Schema in `aufteiler-risiken.md`).
+3. Strategie-Szenarien A (Voll-Aufteilung), B (Teil-Aufteilung), C (Halten + Modernisieren-und-Heben) gegenüberstellen.
+4. Empfehlung mit Begründung.
 
-Stadt-spezifische Sperrfrist nach NRW-Verordnung berücksichtigen (typisch Ruhrgebiet: 5 bis 8 Jahre).
+Wenn Quercheck W7 ergibt: Förderbindung aktiv → Schritt 4 frühzeitig abbrechen mit klarem KO-Vermerk für Aufteiler-Strategie.
 
 ---
 
-### Schritt 4.5: Wirtschaftliche Validierung
+### Schritt 4.5: Wirtschaftliche Validierung (eigener Profi-Subagent)
 
-Aus geprüften Unterlagen die Wirtschaftlichkeit ableiten. Fünf Sub-Schritte, jeweils kompakt mit Tabelle. **Jede Zahl mit Quelle.** Keine Erfindungen — fehlende Werte als Annahme markieren.
+**Wichtig**: Schritt 4.5 wird als **eigener Subagent-Aufruf** (Task-Tool) gestartet, NACH Abschluss der Schritte 2 + 3. Der Wirtschafts-Subagent ist Profi (Investmentprüfer + Banken-Risikoanalyst), Definition in `references/wirtschaftliche-validierung.md`.
 
-#### 4.5.1 Gebäudeanteil am Kaufpreis
+**Subagent-Aufruf**:
 
-Pflichtdaten: Kaufpreis · Grundstücksfläche m² · Bodenrichtwert €/m² (BORIS.NRW oder Aufteiler-Annahme) · Wohnfläche m².
-
-Restwertmethode:
 ```
-Bodenwert    = Grundstück m² × BRW €/m²
-Gebäudewert  = Kaufpreis − Bodenwert
-Gebäudeanteil = Gebäudewert / Kaufpreis
+Du bist der Wirtschafts-Subagent fuer ein MFH-Unterlagenpaket.
+
+PROFI-PROTOKOLL: references/wirtschaftliche-validierung.md
+
+INPUTS:
+- Standort-Live-Variablen aus Schritt 1: {STANDORT_BLOCK}
+- User-Eingaben: KAUFPREIS_EUR, GRUNDSTUECKSFLAECHE_M2, EXPOSE_RENDITE_ANNAHME,
+  BESTAND_RUECKLAGE_EUR, AUFTEILER_STRATEGIE
+- Subagent-Outputs Schritt 2: {ALLE_KERNDATEN_UND_BEFUNDE}
+- Quercheck-Tabelle Schritt 3: {QUERCHECK_TABELLE}
+
+AUFTRAG:
+Wende das Profi-Protokoll vollstaendig an. Liefere alle Bloecke
+B1-B9 (Gebaeudeanteil, Vermieter-NK, Aufteiler-Kosten, Ruecklagen-
+Empfehlung, Mieter-NK, BK-Luecken-Hebel, Mietsteigerung, CapEx
+Best/Real/Worst, Cashflow-Kurve).
+
+Output-Schema steht im Profi-Protokoll. Jede Zahl mit Quelle.
+Annahmen explizit als "Annahme" markieren.
 ```
 
-Output: Tabelle mit Bodenwert, Gebäudewert, Gebäudeanteil%. Plausibilitätsband 50–90% prüfen. Sensitivität BRW ±20% als zweite Tabelle. Falls BRW noch nicht via BORIS.NRW verifiziert: PFLICHT-Hinweis ausgeben.
-
-#### 4.5.2 Vermieter-Nebenkosten EFFEKTIV (ohne Instandhaltungsrücklage)
-
-Quellen: BK-Abrechnung + Versicherungsrechnungen + Allgemeinstrom-Rechnung + Wartungsverträge. **Nur tatsächlich anfallende Kosten** — keine kalkulatorischen Pauschalen, kein Mietausfallwagnis, keine Rücklage (wird in 4.5.4 separat behandelt).
-
-Pflicht-Tabelle:
-
-| Position | EUR/Jahr | umgelegt? | Eigenanteil EUR/Jahr |
-|---|---|---|---|
-| Wohngebäude-Versicherung | … | ja/nein | … |
-| Haus- und Grundbesitzer-Haftpflicht | … | ja/nein | … |
-| Glas-Versicherung | … | ja/nein | … |
-| Allgemeinstrom Treppenhaus | … | ja/nein | … |
-| Hausreinigung (BK-Lücke falls 0 €) | … | ja/nein | … |
-| Gartenpflege (BK-Lücke falls 0 €) | … | ja/nein | … |
-| Versicherungs-Diff Police↔BK-Umlage | … | nein | … |
-| **Bruttokosten Vermieter** | **Σ** | | **Σ Eigenanteil** |
-
-Output: Bruttokosten gesamt + echter Eigenanteil nach BK-Umlage, jeweils auch als €/m²·a und €/m²·Mt.
-
-#### 4.5.3 Aufteiler-Kosten (nur falls Aufteiler-Strategie)
-
-WEG-Verwaltung post-Aufteilung: 30–40 €/WE/Mt × WE-Anzahl × 12. User-Vorgabe verwenden, sonst 37,50 €/WE/Mt als Default.
-
-Tabelle: Position | Annahme | EUR/Jahr (Sondereigentumsverwaltung optional separat).
-
-#### 4.5.4 Gesamtkosten + Rücklagen-Empfehlung
-
-**Rücklagen-Tabelle als %-vom-Kaufpreis** (Investoren-Faustregel, deckt Instandhaltung über Lebenszyklus):
-
-| Ansatz | %-KP | EUR/Jahr | EUR/m²·a | Profil |
-|---|---|---|---|---|
-| Konservativ schlank | 1,5 % | … | … | wenig CapEx absehbar, frische Substanz |
-| Defensiv | 1,75 % | … | … | normaler Bestand 30–50 J. |
-| Standard | 2,0 % | … | … | DIN 18960 Standardansatz |
-| Erhöht | 2,25 % | … | … | Großmaßnahme in 5–10 J. (z.B. Heizung GEG) |
-| Hoch | 2,5 % | … | … | unmittelbarer Sanierungsstau |
-
-User wählt — Empfehlung mit 1–2 Sätzen begründen (Substanz-Alter, anstehende GEG-Pflicht, Bestandsrücklage, Mieterstruktur).
-
-**Drei Sub-Outputs unter Schritt 4.5.4** (jeweils KURZ, eine Tabelle/Block reicht):
-
-##### a) Rücklagenentwicklung
-
-Tabelle 5–10 Jahre Horizont:
-
-| Jahr | Bestand Start | Zuführung €/J | Gesamt-Rücklage |
-|---|---|---|---|
-
-Bestehende Rücklage als Startwert (falls vom Nutzer genannt). Marker setzen bei absehbarer Großmaßnahme (z.B. Heizungstausch GEG 2032), ob Rücklage zum Eintrittsjahr ausreicht.
-
-##### b) Cashflow-Impact unter Prämisse
-
-Prämissen vom Nutzer übernehmen ("keine Großmaßnahme in 5 Jahren", "X € bereits zweckgebunden hinterlegt"). Vergleich:
-- Anzeigen-/Exposé-Annahme (z.B. 20 % Bewirtschaftung)
-- Realistisch-Annahme (4.5.2 + 4.5.3 + gewählter Rücklagensatz)
-- **Cashflow-Differenz pro Monat** ausweisen
-
-##### c) Bewirtschaftungskosten-Realitätscheck
-
-Drei-Zeilen-Block:
-- Anzeige sagt: **X %** (Begründung)
-- DIN 18960 / Marktpraxis Bj.-Klasse: **Y %**
-- Für DIESES Objekt empfohlen: **Z %** (mit Stolpersteinen wie nicht umgelegte Lücken)
-
-Verdict: tragfähig / zu knapp / Cashflow-kritisch.
-
-#### 4.5.5 Mieter-Nebenkosten
-
-Quellen: BK-Abrechnung (alle WE) + Heizkostenabrechnung (ista o.ä.).
-
-Tabelle:
-
-| Block | EUR/Jahr | EUR/m²·Mt |
-|---|---|---|
-| BK kalt (umgelegt) | … | … |
-| Heizung + Warmwasser (Hochrechnung Haus) | … | … |
-| **NK warm gesamt** | **Σ** | **Σ** |
-
-Plus:
-- Anteil NK an Bruttowarm-Miete (%, marktüblich 25–35 %)
-- Vergleich aktuelle NK-VZ pro WE vs. tatsächliche Umlage → § 560 BGB Anpassungspotenzial €/Jahr beziffern
-
-**Marktbenchmark BetrKV-Spiegel** (Bundesdurchschnitt DMB-Betriebskostenspiegel, jährlich aktualisiert):
-- Referenz NK warm: **~2,17 €/m²·Mt** (BetrKV § 2 alle 17 Positionen warm-inkl., Stand 2024)
-- Über-/Unter-Markt-Quote ausweisen: `(NK Objekt − 2,17) / 2,17 × 100 %`
-- Bei deutlich unter Markt: Hinweis auf 1) ungenutztes BK-Umlage-Potenzial, 2) konservative Verwaltung
-- Bei deutlich über Markt: Hinweis auf 1) Kostentreiber identifizieren (Wasser/Heizung/Versicherung), 2) Optimierungspotenzial
-
-**Lücken-Hebel quantifizieren** (BK-Optimierung nach Übernahme):
-
-| Position | EUR/Jahr | Status aktuell | nach Übernahme umlegbar? |
-|---|---|---|---|
-| Allgemeinstrom Treppenhaus | … | leer/Vermieter | ja (BetrKV § 2 Nr. 11) |
-| Glas-Versicherung | … | nicht in BK | ja, sofern Vermieter-Police vereinbart |
-| Hausreinigung | … | leer | ja (BetrKV § 2 Nr. 9) |
-| Gartenpflege | … | leer | ja (BetrKV § 2 Nr. 10) |
-| **Σ BK-Lücken-Hebel** | **Σ €/Jahr** | | **konkrete Mehrumlage Käufer** |
-
-Output: Hebel-Summe als €/Jahr und €/m²·a — Mieteranschreiben § 560 BGB nach Übernahme erforderlich (Anpassungs-VZ + Position in nächster BK-Periode aufnehmen).
+Hauptagent integriert den Subagent-Output in Schritt 5.
 
 ---
 
 ### Schritt 5: Gesamtreport
 
-Als Markdown speichern unter:
+Markdown-Report speichern unter:
 
 ```
-{ankaufsordner}/00_unterlagen-check_{datum}.md
+{ankaufsordner}/00_unterlagen-check_{datum_aktuell}.md
 ```
 
-**Layout-Vorgabe** (kurz, prägnant, nicht aufgeblasen):
+Datum aus dem System (heute), nicht hardcoded.
 
-**Seite 1 = To-Do-Liste nach Ampel sortiert** (rot oben, gelb mitte, grün unten). Direkt abarbeitbar. Jede Zeile mit Quellenverweis als klickbarem Link.
+**Layout-Pflichten**:
 
-**Folgeseiten** = Detail-Sektionen, gleiche Ampelreihenfolge.
+- **Header schlank**: `Adresse · Datum · Anzahl geprüfte Dokumente · Anzahl Mietverhältnisse · WE+Garagen-Count`. **Verkäufer NICHT im Header** — nur als Red Flag, wenn Verkäufer-Konstellation tatsächlich risikobehaftet (Bankverwertung, Erbenverkauf, Insolvenz, Treuhand).
+- **Seite 1 = To-Do-Liste nach Ampel** (rot oben, gelb mitte, grün unten). Direkt abarbeitbar. Jede Zeile mit Quellen-Anker auf Detail-Sektion (PDF-internes Sprungziel) UND mit Quellen-Verweis als `file://`-Link auf Originaldokument.
+- **Folgeseiten** = Detail-Sektionen, gleiche Ampelreihenfolge.
+- **Wiederholungs-Verbot**: To-Do-Zeile = nur Action-Satz mit Anker. Volle Begründung steht ausschließlich in Detail-Sektion.
+- **Vergleichsdaten ≥3 Zeilen** IMMER als Tabelle, nicht als Bullet-Liste.
+- **Empfehlung**: GENAU EINES von 🟢 GO / 🟡 NACHVERHANDELN / 🔴 NO-GO. Keine Doppel-Verdicts.
+- **Risk-Score**: 0–100 (siehe Berechnung unten), prominent unter der Empfehlung.
 
-**Aufbau**:
+**Risk-Score-Berechnung**:
 
 ```
-# Unterlagen-Check Ankauf — [Objektbezeichnung]
-[Datum] · [Anzahl geprüfte Dokumente] Dokumente · [Anzahl] Mietverhältnisse
+Score = min(100, 15 × Anzahl 🔴 + 5 × Anzahl 🟡 + 3 × Anzahl Pflicht-Unterlagen-Lücken)
+```
+
+Schwellen:
+- 0–30 → 🟢 GO
+- 31–65 → 🟡 NACHVERHANDELN
+- 66–100 → 🔴 NO-GO
+
+Bei eindeutigen Deal-Killern (z. B. laufende Förderbindung + Aufteiler-Ziel, ungeklärter Eigentümer-Status) Verdict-Override auf NO-GO unabhängig vom Score, Begründung explizit.
+
+**Aufbau (Markdown-Skelett)**:
+
+```markdown
+# Unterlagen-Check Ankauf — [Adresse]
+[Datum] · [Anzahl geprüfte Dokumente] Dokumente · [Anzahl] Mietverhältnisse · [WE]+[Garagen]
+
+## Empfehlung
+
+[🟢 GO / 🟡 NACHVERHANDELN / 🔴 NO-GO] · **Risk-Score: [Wert]/100**
+
+[Ein Satz Begründung. Keine Romane.]
+
+**Kaufpreis-Anpassung**: [Eurobetrag] (Begründung in Wirtschaftliche Validierung)
+
+---
 
 ## To-Do (Seite 1)
 
 <div class="todo-rot">
 
 ### 🔴 Sofort klären (vor Vertragsunterschrift)
-- [ ] [Konkrete Aktion mit Eurobetrag falls relevant] [grundbuch.pdf, S. 3](file:///pfad/zur/grundbuch.pdf#page=3)
+- [ ] [Konkrete Aktion] [Detail-Anker](#detail-rf-1) [datei.pdf, S. X](file:///pfad/zur/datei.pdf#page=X)
 - [ ] ...
 
 </div>
@@ -361,7 +325,7 @@ Als Markdown speichern unter:
 <div class="todo-gelb">
 
 ### 🟡 Vor Notar nachverhandeln
-- [ ] [Konkrete Aktion] [mietvertrag_we3.pdf, S. 2](file:///pfad/zum/mietvertrag.pdf#page=2)
+- [ ] [Konkrete Aktion] [Detail-Anker](#detail-rf-7) [datei.pdf, S. X]
 - [ ] ...
 
 </div>
@@ -369,52 +333,44 @@ Als Markdown speichern unter:
 <div class="todo-gruen">
 
 ### 🟢 Erledigt / unkritisch
-- [x] Energieausweis vorhanden und gültig
 - [x] ...
 
 </div>
 
 ---
 
-## Empfehlung
+## Inventur
 
-🟢 GO / 🟡 NACHVERHANDELN / 🔴 NO-GO
-
-[Ein Satz Begründung. Keine Romane.]
-
-**Kaufpreis-Anpassung**: [Eurobetrag] (Begründung in Detail-Sektion)
+[Tabelle aus Schritt 1 mit allen 20 Soll-Positionen + Status]
 
 ---
 
-## Inventur
+## Standort-Live-Recherche
 
-[Tabelle aus Schritt 1, kompakt]
+[Tabelle: Variable | Wert | Quelle (URL) | Stand]
 
 ---
 
 <h2 class="rot">🔴 Kritische Red Flags</h2>
 
-### [Red Flag 1: kurzer Titel]
-- Detail [datei.pdf, S. X](file:///pfad#page=X)
+### [Detail-Anker: detail-rf-1] Red Flag 1: kurzer Titel
+- Detail [datei.pdf, S. X](file:///...)
 - Risiko: [konkret, Eurobetrag]
 - Empfehlung: [Aktion]
 
-### [Red Flag 2]
-...
+[…]
 
 ---
 
 <h2 class="gelb">🟡 Wichtige Red Flags</h2>
 
-### [Wichtiger Punkt 1]
-- Detail [datei.pdf, S. X](file:///pfad#page=X)
-- Empfehlung
+[…]
 
 ---
 
 ## Quercheck-Inkonsistenzen
 
-[Tabelle aus Schritt 3, nur ⚠️ und 🔴 Zeilen]
+[Tabelle aus Schritt 3, nur ⚠️ und 🔴-Zeilen]
 
 ---
 
@@ -426,42 +382,22 @@ Als Markdown speichern unter:
 
 ## Aufteiler-Risiken (falls relevant)
 
-[Tabelle aus Schritt 4, knapp]
+[Standort-Live-Block + Risiko-Matrix + Szenarien aus Schritt 4]
 
 ---
 
 ## Wirtschaftliche Validierung
 
-### Gebäudeanteil
-[Tabelle aus 4.5.1 mit Bodenwert / Gebäudewert / Anteil% + BRW-Sensitivität]
-
-### Vermieter-Nebenkosten effektiv (ohne Rücklage)
-[Tabelle aus 4.5.2 + Eigenanteil €/m²·a, €/m²·Mt]
-
-### Aufteiler-Kosten (WEG-Verwaltung)
-[Tabelle aus 4.5.3, falls relevant]
-
-### Rücklagen-Empfehlung
-[Tabelle 1,5–2,5% aus 4.5.4 + Empfehlung in einem Satz]
-
-#### Rücklagenentwicklung
-[Tabelle 5–10 J.]
-
-#### Cashflow-Impact
-[Vergleich Anzeige vs. realistisch, Differenz €/Mt]
-
-#### Bewirtschaftungskosten-Realitätscheck
-[3-Zeilen-Block + Verdict]
-
-### Mieter-Nebenkosten
-[Tabelle aus 4.5.5 + § 560-Anpassungspotenzial]
+[Output des Wirtschafts-Subagents aus Schritt 4.5 — vollständig integrieren:
+ B1 Gebäudeanteil, B2 Vermieter-NK, B3 Aufteiler-Kosten, B4 Rücklagen,
+ B5 Mieter-NK, B6 BK-Lücken, B7 Mietsteigerung, B8 CapEx, B9 Cashflow]
 
 ---
 
 ## Investoren-Perspektive
 
-- Worst-Case-Kosten je Red Flag (Eurobetrag)
-- Empfehlung Kaufpreis-Reduktion: [Eurobetrag]
+- Worst-Case-CapEx je Red Flag (Eurobetrag)
+- Empfehlung Kaufpreis-Reduktion: [Mittelwert Realistisch aus B8] (Begründung verlinkt zu B8)
 - Empfehlung Vertragsänderungen
 
 ## Banken-Perspektive
@@ -477,54 +413,95 @@ Als Markdown speichern unter:
 
 ---
 
+## Anhang: Vor-Ort-Begehung
+
+[Aus references/begehung-checkliste.md — Pflicht-Punkte + risiko-spezifische Marker
+ aus Subagent-Outputs]
+
+---
+
 ## Anhang: Einzelreports pro Dokument
 
 [Subagent-Outputs als Sektionen, Quellenverweise als klickbare Links]
+
+---
+
+## Drei nächste Schritte
+
+1. [Konkret]
+2. [Konkret]
+3. [Konkret]
 ```
 
 **Stilregeln für den Report**:
-- Jede Aussage mit Quellenverweis
+- Jede Aussage mit Quellenverweis (Subagent-Quelle ODER Live-URL)
 - Eurobeträge konkret, keine Pi-mal-Daumen
 - Listen statt Fließtext wo möglich
-- Keine Wiederholungen zwischen To-Do und Detail-Sektion (Detail enthält die volle Begründung, To-Do nur den Action-Satz)
+- Tabellen für ≥3 Vergleichszeilen
+- Keine Wiederholungen zwischen To-Do und Detail-Sektion (Detail enthält die volle Begründung, To-Do nur den Action-Satz mit Ankerlink)
+- Datum dynamisch aus System
 
 ---
 
 ### Schritt 6: PDF-Export
 
-Markdown-Report in PDF konvertieren mit Ampel-Layout und klickbaren Quellenverweisen.
+Markdown-Report in PDF konvertieren mit Ampel-Layout, klickbaren Quellenverweisen und sauberen Seitenumbrüchen.
 
-**Tool**: `~/.claude/skills/unterlagen-check-ankauf/tools/report_to_pdf.py`
+**Tool**: `tools/report_to_pdf.py`
 
 ```bash
-python ~/.claude/skills/unterlagen-check-ankauf/tools/report_to_pdf.py "{ankaufsordner}/00_unterlagen-check_{datum}.md"
+python tools/report_to_pdf.py "{ankaufsordner}/00_unterlagen-check_{datum}.md"
 ```
 
-**Effekt**: Erzeugt `00_unterlagen-check_{datum}.pdf` neben dem Markdown. Einziger Output, kein HTML, kein Companion.
+**Effekt**: Erzeugt `00_unterlagen-check_{datum}.pdf` neben dem Markdown.
 
-**Quellen-Links im PDF**: als **GoToR-Actions** mit relativen Pfaden eingebettet (PDF-Standard-Cross-Document-Refs, ISO 32000-1 §12.6.4.5). Funktioniert in Edge (bestätigt), Adobe, Foxit, SumatraPDF — `#page=X`-Anker bleibt erhalten.
+**PDF-Umbruch-Regeln** (im Tool implementiert):
+- Tabellen, Detail-Sektionen, Red-Flag-Einträge, To-Do-Buckets, Quercheck-Tabellen werden NICHT mitten durch geteilt.
+- Mehrere kurze Blöcke teilen sich eine Seite.
+- Lange Blöcke dürfen über mehrere Seiten gehen, brechen aber an sauberen Nahtstellen (Tabellenzeile, Bullet-Punkt, Absatz).
+- Verbot: halber Block am Seitenende + Rest auf Folgeseite.
 
-**Warum nicht direkt `file://` im PDF?** Chromium-PDF-Viewer (Edge, Chrome) blockieren `file://`-URI-Actions in PDFs als Sicherheitssandbox seit 2021. Edge zeigt dann `ERR_FILE_NOT_FOUND` trotz existierender Datei. GoToR umgeht diese Sandbox, weil es als legitime PDF-interne Doc-Navigation behandelt wird, nicht als externer Web-Link. Der Konverter im Skript ersetzt nach dem Edge-Druck automatisch alle `file://`-URIs durch GoToR-Actions.
+**Quellen-Links im PDF**: als GoToR-Actions mit relativen Pfaden eingebettet (PDF-Standard ISO 32000-1 §12.6.4.5). Funktioniert in Edge, Adobe, Foxit, SumatraPDF — `#page=X`-Anker bleibt erhalten.
 
 **Voraussetzung**: einmalige Installation
 ```bash
 pip install --user markdown pikepdf
 ```
 
-**Wenn Edge nicht gefunden wird**: Skript meldet das. In dem Fall Fallback Markdown-Report öffnen und über Browser-Druck als PDF speichern.
+---
+
+### Schritt 7: Verkäufer-Anschreiben (optional)
+
+Wenn der Hauptagent fehlende Unterlagen identifiziert hat ODER der User explizit "Verkäufer anschreiben" anfordert: zweite Markdown-Datei generieren:
+
+```
+{ankaufsordner}/01_verkäufer-nachforderung_{datum}.md
+```
+
+Inhalt:
+- Anrede + Bezug zum Objekt
+- Liste aller fehlenden Unterlagen aus Schritt 5
+- Liste aller 🔴-To-Dos, die Verkäufer-Klärung erfordern
+- Rückmelde-Frist (Vorschlag: vor LOI / Notartermin)
+- Optional: PDF-Konvertierung über Schritt-6-Tool
+
+Nur auf User-Anforderung erstellen — nicht automatisch.
 
 ---
 
 ## Constraints
 
 - **Keine Erfindungen**. Wenn ein Dokument nicht vorliegt oder unklar ist: explizit "nicht prüfbar".
+- **Keine Hardcoded-Geographie**. Nichts Stadt-/Bundesland-spezifisches in den Prompts oder References — alles über Variablen aus Schritt 1.
+- **Live-Recherche bei Rechtszitaten**: Datum + URL zwingend. Bei Trainings-Wissen ohne Live-Verifikation → `nicht_pruefbar`.
 - **Bei rechtlichen Detailfragen** (Klausel-Wirksamkeit, Mietminderung, Eigenbedarfskündigung): immer "muss vor Kaufvertrag von Anwalt geprüft werden" anhängen.
 - **Bei steuerlichen Fragen** (AfA, Spekulationsfrist, gewerblicher Grundstückshandel): Steuerberater-Verweis.
-- **Sanierungs- und Reparaturkosten** als Schätzung benennen, ohne pauschalen Aufschlag. Nutzer rechnet selbst mit Sicherheitsaufschlägen.
+- **Sanierungs- und Reparaturkosten** als Schätzung mit Bandbreite Best/Real/Worst (siehe `wirtschaftliche-validierung.md` B8). Nutzer rechnet selbst mit Sicherheitsaufschlägen.
 - **Beträge in Euro nennen, nicht in Prozent allein**. Bei Empfehlung "Kaufpreis um X reduzieren" konkrete Eurobeträge.
 - **Quellenverweise** sind PFLICHT bei jedem Befund und jeder Red Flag, Format `[datei.pdf, S. X]` bzw. als klickbarer `file://`-Link im finalen Report.
 - **Sprache**: Deutsch, professionell, kurz. **Keine Gedankenstriche** (–, —), stattdessen Komma oder Punkt.
 - **Subagent-Outputs sind Quelle der Wahrheit**: Hauptagent darf nicht eigenständig Informationen ergänzen, die der Subagent nicht extrahiert hat. Wenn Lücke, dann offene Frage formulieren.
+- **Fallback bei unbekanntem Dokumenttyp**: nicht stillschweigend generischer Subagent — explizit als `fallback_generisch` markieren + Empfehlung im Report.
 
 ## Stil
 
