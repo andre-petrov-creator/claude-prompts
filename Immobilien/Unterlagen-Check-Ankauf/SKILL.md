@@ -116,41 +116,35 @@ Bevor irgendein Dokument inhaltlich geprüft wird:
 
 ---
 
-### Schritt 1.5: Große PDFs splitten + Scans OCRen
+### Schritt 1.5: PDFs für Multimodal-Lesung vorbereiten
 
-Aus der Klassifizierung in Schritt 1 ergeben sich zwei Vorbereitungs-Pipelines, die VOR dem Subagent-Spawn laufen müssen.
+**Architektur-Prinzip Skill v4 — Lese/Audit-Trennung:**
 
-**Reihenfolge**: Erst OCR (Klasse `scan` und `scan+split`), dann Split (Klasse `split` und `scan+split`).
-Begründung: Nach OCR ist die Datei meist größer (Text-Layer + Optimierung), Split-Schwelle muss am OCR-Output gemessen werden.
+Subagents bekommen NICHT die PDF, sondern bereits **extrahierten Text** (in Schritt 1.6 vom Hauptagent erzeugt). Grund: Subagent-Sandboxes haben PDF-Tool-Lottery (pdftoppm fehlt zufällig in ~20 % der Subagent-Instanzen). Hauptagent ist **multimodal** und liest PNG-Renderings zuverlässig — das ist die hochwertigste Lese-Methode für deutsche Behörden-/Hausverwaltungs-Dokumente und ersetzt OCR vollständig.
 
-#### Pipeline A: OCR für Scan-PDFs
+Pipeline-Reihenfolge: **Erst Split (für >25 MB), dann Render (Multimodal-Vorbereitung)**.
 
-Für Klasse `scan` und `scan+split`:
+#### Pipeline R: Render aller PDFs zu PNGs (Hauptweg)
+
+Für **alle** PDFs (Klassen `text`, `scan`, `split`, `scan+split`):
 
 ```bash
-python ~/.claude/skills/unterlagen-check-ankauf/tools/pdf_ocr.py "/pfad/zum/scan.pdf"
+python ~/.claude/skills/unterlagen-check-ankauf/tools/pdf_render.py "<unterlagen-ordner>" --dpi 160
 ```
 
-**Effekt**: Geschwister-Datei `_ocr_<originalname>.pdf` neben dem Scan, mit Text-Layer (deu+eng).
+**Effekt**: Pro PDF Geschwister-Ordner `_render_<originalname>/` mit `page_001.png`, `page_002.png`, ... + `_manifest.json` (Mapping page → Originalseite).
 
-**Bei fehlenden Tools** (`ocrmypdf` Python-Paket oder `tesseract` Binary fehlen):
-- Skript exitet mit klarer Install-Anweisung (Codes 10/11/12).
-- **Workflow läuft trotzdem weiter**: Datei bleibt unverändert, im Manifest als "OCR fehlgeschlagen" markieren.
-- Betroffener Subagent meldet später Status `nicht_pruefbar` mit Begründung "Scan ohne Text-Layer, OCR-Tools fehlen".
-- Hauptagent fasst diese Lücken am Ende des Reports unter "Fehlende Unterlagen / nicht prüfbar" zusammen.
+**Voraussetzung**: PyMuPDF (Python-Paket, plattformunabhängig, kein Binary-Install).
 
-Installation einmalig (Windows):
 ```bash
-pip install --user ocrmypdf
-# tesseract: https://github.com/UB-Mannheim/tesseract/wiki
-# Beim Installer "German" als Sprachpaket mit anhaken, oder nachträglich "deu" laden
+pip install --user pymupdf
 ```
 
-**Subagent-Pfad nach OCR**: Subagent bekommt im Prompt den `_ocr_*.pdf`-Pfad als `DATEIPFAD`. Originalpfad geht zusätzlich als `ORIGINAL_PFAD` mit, damit Quellenverweise auf die Original-Datei zeigen.
+**Warum Render statt OCR**: Hauptagent liest die PNGs in Schritt 1.6 multimodal — das ergibt höhere Lese-Qualität als Tesseract-OCR (Tabellen, Stempel, Handschrift, gemischte Layouts). Kein Tesseract-Install nötig.
 
-#### Pipeline B: Split für PDFs > 25 MB
+#### Pipeline S: Split für PDFs > 25 MB
 
-Für Klasse `split` und `scan+split` (am OCR-Output gemessen, falls vorher OCR lief):
+Für Klasse `split` und `scan+split` (vor dem Render):
 
 **Tool**: `tools/pdf_split.py`
 
@@ -160,9 +154,65 @@ python tools/pdf_split.py "/pfad/zur/grossen.pdf"
 
 **Effekt**: Erzeugt Geschwister-Ordner `_split_<dateiname>/` mit `part_001.pdf`, `part_002.pdf`, ... und `_manifest.json`. Jeder Chunk ≤ 25 MB.
 
-**Subagent für gesplittete Datei**: Bekommt im Prompt zusätzlich den Hinweis, dass die Originaldatei in mehrere Parts aufgeteilt ist, und liest diese sequenziell. Pfadangabe geht auf den `_split_*`-Ordner, nicht auf einzelne Parts.
+**Anschließend**: pdf_render.py auf jeden Part anwenden, damit auch große PDFs multimodal lesbar werden.
 
-**Quellenverweis bleibt korrekt**: Das `_manifest.json` enthält das Mapping Part → Originalseiten. Subagent verweist im Output mit der Originalseiten-Nummer plus Original-Dateipfad, nicht mit Part-Pfad.
+**Quellenverweis bleibt korrekt**: Das `_manifest.json` enthält das Mapping Part → Originalseiten.
+
+#### Pipeline OCR (optional, Massenverarbeitung)
+
+Tool `tools/pdf_ocr.py` bleibt verfügbar als Backup für Token-effiziente Massenverarbeitung (>50 PDFs, wo Hauptagent-Multimodal zu teuer wird). Standard-Workflow Skill v4 nutzt **Render** statt OCR.
+
+---
+
+### Schritt 1.6: Multimodal-Extraktion durch Hauptagent (NEU in Skill v4)
+
+Pro PDF (mit gerendertem `_render_<name>/`-Ordner) führt der **Hauptagent** folgende Sequenz aus:
+
+1. Lies alle `page_NNN.png` des `_render_<name>/`-Ordners via Read-Tool (Hauptagent ist multimodal — das ist die native, hochqualitative Lesung).
+2. Extrahiere strukturiert in eine Markdown-Datei `_extract_<originalname>.md` neben der PDF:
+
+```markdown
+# Extract: <originalname>.pdf
+
+**Quelle**: <originalname>.pdf
+**Seiten**: <n>
+**Render-DPI**: 160
+**Datum Extraktion**: YYYY-MM-DD
+
+## Seite 1
+
+### Header / Briefkopf
+[Aussteller, Datum, Adressat, Aktenzeichen]
+
+### Inhalt
+[Volltext-Zusammenfassung der Seite, alle relevanten Datenpunkte als Bullets]
+
+### Tabellen
+[Tabellen 1:1 als Markdown-Tabelle wiedergeben]
+
+### Stempel / Unterschriften
+[Sichtbare Stempel, Genehmigungsvermerke, Unterschriften (geschwärzt/sichtbar)]
+
+## Seite 2
+[gleiche Struktur]
+
+...
+```
+
+3. Pflichtfelder pro Seite:
+   - **Datum**, **Aussteller**, **Aktenzeichen** (sofern vorhanden)
+   - **Beträge in Euro** (alle nennen, nicht runden)
+   - **Adresse / Flurstück / Gemarkung** (für Identitäts-Quercheck)
+   - **Bei Verträgen**: Mietbeginn, Kalt-/Warm-Miete, BK-VZ, HK-VZ, Kaution, Indexierung/Staffel
+   - **Bei NK-Abrechnungen**: Verteilerschlüssel, m²-Bezugsbasis, Einzelpositionen €/Jahr, VZ vs. Ergebnis
+   - **Bei Bauakte**: Baujahr, genehmigte WE, Auflagen, Schlussabnahme-Datum
+
+4. Rote Texte / Streichungen / Rötungen explizit markieren als `[GELÖSCHT]` oder `[GERÖTET]` — wichtig für Grundbuch-Auszüge (siehe `references/01-grundbuch.md`).
+
+**Vorteil dieser Architektur:**
+- Multimodal-Lesung des Hauptagents ist die qualitativ beste verfügbare Methode (besser als Tesseract).
+- Subagents bekommen sauberen Text statt PDF — keine Sandbox-Lottery, robust und schnell.
+- Token-Bilanz: Hauptagent zahlt einmalig die Bild-Tokens, Subagents arbeiten mit Text (= günstiger und schneller).
 
 ---
 
@@ -173,16 +223,19 @@ Für jede vorhandene Datei einen Profi-Subagent via Task-Tool spawnen. **Mehrere
 **Subagent-Prompt-Template** (für jeden Task-Call individuell befüllen):
 
 ```
-Du bist ein Profi-Subagent für genau einen Dokumenttyp eines MFH-Ankaufspakets.
+Du bist ein Profi-Subagent (Auditor) für genau einen Dokumenttyp eines
+MFH-Ankaufspakets. Du LIEST KEINE PDF — der Hauptagent hat den Inhalt
+bereits multimodal extrahiert. Du arbeitest mit dem extrahierten Text.
 
 PROFI-PROTOKOLL: {PROTOKOLL_PFAD}
    → Lies dieses Protokoll vollständig. Es definiert deine Rolle, Pflichtfelder,
      Live-Quellen, Wechselwirkungs-Hooks und Risiko-Indikatoren.
 
-DOKUMENT: {DATEIPFAD}
-   → Bei gesplitteten Files: Original-Datei {ORIGINAL_PFAD},
-     Split-Ordner {SPLIT_ORDNER}, Manifest {SPLIT_ORDNER}/_manifest.json.
-     Lies parts der Reihe nach, nutze Manifest fuer Originalseiten-Mapping.
+EXTRAHIERTER DOKUMENT-INHALT: {EXTRACT_PFAD}
+   → Markdown-Datei mit dem strukturierten Inhalt des Original-PDF
+     (vom Hauptagent in Schritt 1.6 via Multimodal-Read aus PNG-Renderings
+     erstellt). Enthält pro Seite: Header, Inhalt, Tabellen, Stempel.
+   → ORIGINAL-PDF: {ORIGINAL_PFAD} (für Quellenverweise im Output)
 
 STANDORT-KONTEXT (aus Schritt 1, zentrale Live-Recherche):
 {STANDORT_BLOCK}
@@ -193,25 +246,16 @@ STANDORT-KONTEXT (aus Schritt 1, zentrale Live-Recherche):
 
 AUFTRAG:
 1. Profi-Protokoll vollstaendig anwenden.
-2. Lies die Datei {DATEIPFAD} vollständig (bei gesplitteten Files: alle parts).
-   FALLBACK-KASKADE bei Lese-Fehlern (Sandbox-Lottery):
-   a) Read direkt → wenn pdftoppm-Fehler oder andere Konvertierungs-Probleme:
-      nicht raten, weiter zu (b).
-   b) Bash: pdftotext -layout "{DATEIPFAD}" -
-      (extrahiert Text direkt, kein Bildkonverter nötig).
-   c) Bash: python -c "from pypdf import PdfReader; r=PdfReader('{DATEIPFAD}');
-      print('\\n--- PAGE BREAK ---\\n'.join(p.extract_text() or '' for p in r.pages))"
-   d) Wenn alle drei Fallbacks scheitern UND die Datei laut Inventur als Scan
-      klassifiziert war (Klasse 'scan' / 'scan+split'): Status 'nicht_pruefbar'
-      mit Begründung "Scan ohne Text-Layer, OCR fehlgeschlagen oder Tools fehlen.
-      Originalfehler: <ORIGINAL-FEHLERTEXT>".
-   e) Pflicht: bei jedem Lese-Fehler den ORIGINALEN Tool-Fehlertext im Output mit
-      angeben — nicht zusammenfassen, nicht paraphrasieren. Der Hauptagent
-      erkennt daran Sandbox-Lottery-Fälle und kann nachsteuern.
+2. Lies {EXTRACT_PFAD} vollständig — DAS ist deine Daten-Quelle.
+   Du brauchst die PDF NICHT zu öffnen. Falls das Extract Lücken aufweist
+   (z. B. "[unleserlich]" oder fehlende Felder), rückmelden mit Status
+   "unvollstaendig" und konkret nennen, welche Daten fehlen — der
+   Hauptagent kann dann gezielt nachrendern (höherer DPI / fehlende Seite).
 3. Bei jedem Rechtszitat: Live-URL + Datum aus Standort-Block beziehen,
    sonst Status "nicht_pruefbar".
 4. Bei jedem konkreten Befund und jeder Red Flag: Quelle als
-   [datei.pdf, S. X] anhaengen (Originaldatei-Name + Originalseiten-Nr.).
+   [<originaldatei>.pdf, S. X] anhaengen — Seitenzahl aus dem Extract
+   (Sektion "## Seite N").
 5. Wechselwirkungs-Datenpunkte fuer Quercheck-Matrix klar markieren
    (siehe Hooks im Profi-Protokoll).
 6. Antworte AUSSCHLIESSLICH im folgenden Schema (kein Vorwort, kein Abschluss,
@@ -559,7 +603,7 @@ Nur auf User-Anforderung erstellen — nicht automatisch.
 - **Sprache**: Deutsch, professionell, kurz. **Keine Gedankenstriche** (–, —), stattdessen Komma oder Punkt.
 - **Subagent-Outputs sind Quelle der Wahrheit**: Hauptagent darf nicht eigenständig Informationen ergänzen, die der Subagent nicht extrahiert hat. Wenn Lücke, dann offene Frage formulieren.
 - **Fallback bei unbekanntem Dokumenttyp**: nicht stillschweigend generischer Subagent — explizit als `fallback_generisch` markieren + Empfehlung im Report.
-- **Lese-Fehler müssen Original-Fehlertext enthalten**: Subagents geben bei `nicht_pruefbar` immer den unveränderten Tool-Fehlertext (pdftoppm-Stderr, pdftotext-Stderr, pypdf-Exception) zurück, damit der Hauptagent Sandbox-Lottery (kein pdftoppm in der Subagent-Sandbox) von echten PDF-Defekten unterscheiden kann.
+- **Lese/Audit-Trennung (Skill v4)**: Subagents arbeiten ausschließlich mit dem in Schritt 1.6 vom Hauptagent erzeugten `_extract_<name>.md`. Subagents lesen keine PDFs — das verhindert Sandbox-Lottery und nutzt die Multimodal-Stärke des Hauptagents als zentrale Lesequelle. Wenn ein Extract Lücken hat (`[unleserlich]` o.ä.), Subagent meldet `unvollstaendig` mit konkretem Hinweis welche Daten fehlen, Hauptagent rendert gezielt mit höherem DPI nach.
 
 ## Stil
 
