@@ -41,14 +41,20 @@ Sieben Schritte. Schritt 2 läuft parallel.
 Bevor irgendein Dokument inhaltlich geprüft wird:
 
 1. Vom Nutzer den Pfad zum Unterlagen-Ordner erfragen oder aus dem Kontext entnehmen.
-2. Ordnerinhalt auflisten, Dateigrößen prüfen — jede PDF > 25 MB markieren als "Split nötig".
-3. Jede Datei einem Dokumenttyp zuordnen (siehe Mapping unten).
-4. Standort-Variablen aus Grundbuch / Adresse / Exposé extrahieren:
+2. Ordnerinhalt auflisten (Bash `ls`, `find`).
+3. **Pre-Flight-Klassifizierung** via `tools/pdf_classify.py`:
+   - Pro PDF: Größe + Text-Layer-Probe (pdftotext, >100 Bytes Output) + Split-Bedarf
+   - Klassen: `text` / `split` / `scan` / `scan+split`
+   ```bash
+   python ~/.claude/skills/unterlagen-check-ankauf/tools/pdf_classify.py "<unterlagen-ordner>" --markdown
+   ```
+4. Jede Datei einem Dokumenttyp zuordnen (siehe Mapping unten).
+5. Standort-Variablen aus Grundbuch / Adresse / Exposé extrahieren:
    - `OBJEKT_ADRESSE`
    - `OBJEKT_GEMEINDE`
    - `OBJEKT_KREIS`
    - `OBJEKT_BUNDESLAND`
-5. **Standort-Live-Recherche** (zentral, einmalig — Ergebnisse werden allen Subagents als Kontext mitgegeben):
+6. **Standort-Live-Recherche** (zentral, einmalig — Ergebnisse werden allen Subagents als Kontext mitgegeben):
    - **BORIS-Portal** des `OBJEKT_BUNDESLAND` für Bodenrichtwert (URL live recherchieren — jedes Bundesland hat eigenes Portal)
    - **Mietspiegel** `OBJEKT_GEMEINDE` (qualifiziert / einfach / nicht vorhanden)
    - **Kappungsgrenzenverordnung** `OBJEKT_BUNDESLAND` § 558 Abs. 3 BGB (15 % oder 20 % in 3 J. + Geltungsbereich)
@@ -59,18 +65,21 @@ Bevor irgendein Dokument inhaltlich geprüft wird:
    - **Hebesatz Grundsteuer** `OBJEKT_GEMEINDE`
    - **DMB-BetrKV-Spiegel** aktueller Stand (bundesweiter Benchmark NK warm)
    - Rechercheergebnisse mit URL + Stand-Datum dokumentieren. Bei nicht ermittelbar: explizit `nicht_pruefbar`.
-6. Vom User zusätzliche Inputs erfragen (sofern nicht schon im Kontext):
+7. Vom User zusätzliche Inputs erfragen (sofern nicht schon im Kontext):
    - **Kaufpreis** EUR
    - **Exposé/Verkaufsanzeige** (für Anzeigen-vs-Realität-Vergleich) — falls nicht vorhanden, als `nicht angegeben` weiterführen
    - **Bestand Instandhaltungs-Rücklage** (Hausgeldkonto-Bestand) — falls nicht vorhanden, als `nicht angegeben`
    - **Aufteiler-Strategie?** (ja/nein) — wenn ja, Schritt 4 + 4.5 mit Aufteiler-Spezifika
-7. Soll-Ist-Vergleich Inventur ausgeben — **alle 20 Soll-Positionen** mit Status, auch n/a:
+8. Soll-Ist-Vergleich Inventur ausgeben — **alle 20 Soll-Positionen** mit Status (Spalte **Lesbar** ist Pflicht — entscheidet Pipeline in Schritt 1.5):
 
-| Nr | Dokumenttyp | Datei | Größe | Status |
-|---|---|---|---|---|
-| 01 | Grundbuchauszug | `grundbuch_2026.pdf` | 1.2 MB | ✅ Vorhanden |
-| 02 | Flurkarte | — | — | ❌ Fehlt |
-| ... | ... | ... | ... | ... |
+| Nr | Dokumenttyp | Datei | Größe | Lesbar | Status |
+|---|---|---|---|---|---|
+| 01 | Grundbuchauszug | `grundbuch_2026.pdf` | 1.2 MB | ✅ Text | ✅ Vorhanden |
+| 02 | Flurkarte | — | — | — | ❌ Fehlt |
+| 12 | Bauakte | `bauakte.pdf` | 22 MB | 🟡 OCR nötig | ⚠️ Scan |
+| 14 | Großes Gutachten | `gutachten.pdf` | 38 MB | ✅ Text | ⚠️ Split nötig |
+| 15 | Bauakte alt | `bauakte_alt.pdf` | 41 MB | 🟡 OCR nötig | ⚠️ Split + OCR |
+| ... | ... | ... | ... | ... | ... |
 
 **Mapping Dokumenttyp → Profi-Subagent-Reference**:
 
@@ -107,9 +116,41 @@ Bevor irgendein Dokument inhaltlich geprüft wird:
 
 ---
 
-### Schritt 1.5: Große PDFs splitten (falls nötig)
+### Schritt 1.5: Große PDFs splitten + Scans OCRen
 
-Wenn in der Inventur PDFs mit "Split nötig" markiert wurden (typisch >25 MB, vor allem Bauakten), VOR dem Subagent-Spawn splitten.
+Aus der Klassifizierung in Schritt 1 ergeben sich zwei Vorbereitungs-Pipelines, die VOR dem Subagent-Spawn laufen müssen.
+
+**Reihenfolge**: Erst OCR (Klasse `scan` und `scan+split`), dann Split (Klasse `split` und `scan+split`).
+Begründung: Nach OCR ist die Datei meist größer (Text-Layer + Optimierung), Split-Schwelle muss am OCR-Output gemessen werden.
+
+#### Pipeline A: OCR für Scan-PDFs
+
+Für Klasse `scan` und `scan+split`:
+
+```bash
+python ~/.claude/skills/unterlagen-check-ankauf/tools/pdf_ocr.py "/pfad/zum/scan.pdf"
+```
+
+**Effekt**: Geschwister-Datei `_ocr_<originalname>.pdf` neben dem Scan, mit Text-Layer (deu+eng).
+
+**Bei fehlenden Tools** (`ocrmypdf` Python-Paket oder `tesseract` Binary fehlen):
+- Skript exitet mit klarer Install-Anweisung (Codes 10/11/12).
+- **Workflow läuft trotzdem weiter**: Datei bleibt unverändert, im Manifest als "OCR fehlgeschlagen" markieren.
+- Betroffener Subagent meldet später Status `nicht_pruefbar` mit Begründung "Scan ohne Text-Layer, OCR-Tools fehlen".
+- Hauptagent fasst diese Lücken am Ende des Reports unter "Fehlende Unterlagen / nicht prüfbar" zusammen.
+
+Installation einmalig (Windows):
+```bash
+pip install --user ocrmypdf
+# tesseract: https://github.com/UB-Mannheim/tesseract/wiki
+# Beim Installer "German" als Sprachpaket mit anhaken, oder nachträglich "deu" laden
+```
+
+**Subagent-Pfad nach OCR**: Subagent bekommt im Prompt den `_ocr_*.pdf`-Pfad als `DATEIPFAD`. Originalpfad geht zusätzlich als `ORIGINAL_PFAD` mit, damit Quellenverweise auf die Original-Datei zeigen.
+
+#### Pipeline B: Split für PDFs > 25 MB
+
+Für Klasse `split` und `scan+split` (am OCR-Output gemessen, falls vorher OCR lief):
 
 **Tool**: `tools/pdf_split.py`
 
@@ -152,13 +193,29 @@ STANDORT-KONTEXT (aus Schritt 1, zentrale Live-Recherche):
 
 AUFTRAG:
 1. Profi-Protokoll vollstaendig anwenden.
-2. Bei jedem Rechtszitat: Live-URL + Datum aus Standort-Block beziehen,
+2. Lies die Datei {DATEIPFAD} vollständig (bei gesplitteten Files: alle parts).
+   FALLBACK-KASKADE bei Lese-Fehlern (Sandbox-Lottery):
+   a) Read direkt → wenn pdftoppm-Fehler oder andere Konvertierungs-Probleme:
+      nicht raten, weiter zu (b).
+   b) Bash: pdftotext -layout "{DATEIPFAD}" -
+      (extrahiert Text direkt, kein Bildkonverter nötig).
+   c) Bash: python -c "from pypdf import PdfReader; r=PdfReader('{DATEIPFAD}');
+      print('\\n--- PAGE BREAK ---\\n'.join(p.extract_text() or '' for p in r.pages))"
+   d) Wenn alle drei Fallbacks scheitern UND die Datei laut Inventur als Scan
+      klassifiziert war (Klasse 'scan' / 'scan+split'): Status 'nicht_pruefbar'
+      mit Begründung "Scan ohne Text-Layer, OCR fehlgeschlagen oder Tools fehlen.
+      Originalfehler: <ORIGINAL-FEHLERTEXT>".
+   e) Pflicht: bei jedem Lese-Fehler den ORIGINALEN Tool-Fehlertext im Output mit
+      angeben — nicht zusammenfassen, nicht paraphrasieren. Der Hauptagent
+      erkennt daran Sandbox-Lottery-Fälle und kann nachsteuern.
+3. Bei jedem Rechtszitat: Live-URL + Datum aus Standort-Block beziehen,
    sonst Status "nicht_pruefbar".
-3. Bei jedem konkreten Befund und jeder Red Flag: Quelle als
-   [datei.pdf, S. X] anhaengen.
-4. Wechselwirkungs-Datenpunkte fuer Quercheck-Matrix klar markieren
+4. Bei jedem konkreten Befund und jeder Red Flag: Quelle als
+   [datei.pdf, S. X] anhaengen (Originaldatei-Name + Originalseiten-Nr.).
+5. Wechselwirkungs-Datenpunkte fuer Quercheck-Matrix klar markieren
    (siehe Hooks im Profi-Protokoll).
-5. Antworte AUSSCHLIESSLICH im folgenden Schema:
+6. Antworte AUSSCHLIESSLICH im folgenden Schema (kein Vorwort, kein Abschluss,
+   kein Markdown-Codeblock drumherum):
 
 ---
 dokument: "{DOKUMENTTYP}"
@@ -502,6 +559,7 @@ Nur auf User-Anforderung erstellen — nicht automatisch.
 - **Sprache**: Deutsch, professionell, kurz. **Keine Gedankenstriche** (–, —), stattdessen Komma oder Punkt.
 - **Subagent-Outputs sind Quelle der Wahrheit**: Hauptagent darf nicht eigenständig Informationen ergänzen, die der Subagent nicht extrahiert hat. Wenn Lücke, dann offene Frage formulieren.
 - **Fallback bei unbekanntem Dokumenttyp**: nicht stillschweigend generischer Subagent — explizit als `fallback_generisch` markieren + Empfehlung im Report.
+- **Lese-Fehler müssen Original-Fehlertext enthalten**: Subagents geben bei `nicht_pruefbar` immer den unveränderten Tool-Fehlertext (pdftoppm-Stderr, pdftotext-Stderr, pypdf-Exception) zurück, damit der Hauptagent Sandbox-Lottery (kein pdftoppm in der Subagent-Sandbox) von echten PDF-Defekten unterscheiden kann.
 
 ## Stil
 
