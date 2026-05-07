@@ -34,6 +34,7 @@ Inputs (BGF/NHK/Idx/Fakt)┘
 - `Kalkulation_Aufteiler_<...>.xlsx` befüllt — Markt-VK, Cashflow-VK, Renditen
 - `mietspiegelrechner_lookup` (in `modul_5_verdict.xml` v1.2) — Stadt → URL für Pflicht-Aufgabe Mietspiegel-Verifikation
 - v1.2: BGF, NHK_2010, BKI-Index 2026, Sachwertfaktor aus Modul 1 v1.1 für Sektion 3 (Sachwertverfahren)
+- v1.3: Bewirtschaftungs-Schätzung (Quote, Aufschlüsselungs-Posten, Σ Fixkosten, Freier Cashflow für Rücklage), Rücklagen-Entwicklung (Bestand-Start, Aufbau/Jahr, Pro-Jahr-Pfad bis GEG-Stichtag), Profil-Bausteine (4–5 Bullet-Quotes + Verdict-Schluss-Satz) für Sektion 8.5
 
 **Verarbeitung:**
 - 11 Sektionen aufbauen (Cover bis Anhang Quellen) gemäß `<pdf_struktur>`-Block
@@ -61,6 +62,7 @@ Inputs (BGF/NHK/Idx/Fakt)┘
 | Sektion 3 Gebäudewert (v1.2) | PDF-Inhalt | Sachwertverfahren 4 Blöcke; Inputs aus Modul 1 v1.1 |
 | Sektion 8.2 Aggregat-Treppe (v1.2) | Chart 08b | Summe monatlicher Stufenmieten Mt 0–maxReach |
 | Sektion 8.3 Pro-WE-Stufentabellen (v1.2) | PDF-Inhalt | je WE eine Tabelle Format A (Stufe / Monat-Range / Stufenmiete / Subv./Mt / Dauer / Σ Phase + Σ-berechnet-Zeile) |
+| Sektion 8.5 Bewirtschaftungs-Einschätzung (v1.3) | PDF-Inhalt | drei Sub-Blocks: 8.5.1 Verdict-Statement + Aufschlüsselungs-Tabelle (Position/EUR/Jahr) mit Σ Fixkosten + Freier Cashflow; 8.5.2 Rücklagen-Pfad-Tabelle (Jahr/Bestand/Aufbau/Gesamt) bis GEG-Stichtag + Heizungstausch-Bewertung; 8.5.3 Profil-Bullets für Anzeige + Verdict-Schluss-Satz |
 | Excel-Comment `BESICHTIGUNG!A40` | Excel-Write | 5-Zeilen-Verdict + Verhandlungsziel + Pflicht-Schritte |
 | Excel-Comment `RENO!K105` | Excel-Write | Mietsubvention Berechnungs-Verweis |
 | Excel-Comment `VK_CF!C9` | Excel-Write | AfA-Festlegung BFH-Argument |
@@ -83,6 +85,7 @@ Inputs (BGF/NHK/Idx/Fakt)┘
 
 | Version | Datum | Änderung (Stichwort) | Plan-Ref |
 |---------|-------|----------------------|----------|
+| v1.3 | 2026-05-07 | Sektion 8.5 Bewirtschaftungs-Einschätzung mit drei Sub-Blocks (Aufschlüsselung + Rücklagen-Pfad + Profil für Anzeige) | `plans/2026-05-07-modul5-bewirtschaftungs-einschaetzung.md` |
 | v1.2 | 2026-05-07 | Mietspiegelrechner-Lookup, To-do-Pflicht-Items, Subv-Stufentabellen pro WE + Aggregat-Treppe, Sachwertverfahren in Sektion 3, Cover-Headline neu, Skill-PFLICHT auf v1.1 | `plans/2026-05-07-modul5-pdf-export-anpassung.md` |
 | v1.1 | 2026-04-27 | Skill-PFLICHT-Verweis (R1–R13), Spaltenbreiten-Regel, Word-Wrap, KeepTogether, User-Reihenfolge erlaubt | — |
 | v1.0 | 2026-04-26 | Initial | — |

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<modul name="Verdict-Export" id="5" version="1.2" language="de">
+<modul name="Verdict-Export" id="5" version="1.3" language="de">
 
   <!--
     MODUL 5 - VERDICT-EXPORT (PDF + Excel-Notizen)
@@ -26,6 +26,29 @@
     - Module 0-4 muessen durchgelaufen sein (Outputs in Chat-Kontext)
     - Excel Kalkulation_Aufteiler ist befuellt
     - Wenn nicht: STOPP, User-Hinweis "Erst Module 0-4 ausfuehren".
+
+    AENDERUNGEN v1.3 vs v1.2 (2026-05-07):
+    - Neue Sektion 8.5 "Bewirtschaftungs-Einschaetzung + Ruecklagen-Entwicklung +
+      Profil fuer Anzeige" zwischen Sektion 8.4 und 9. Bisher entstand die
+      Bewirtschaftungs-Schaetzung im Chat-Output, kam aber nicht ins PDF.
+    - Drei Sub-Bloecke in 8.5:
+        8.5.1 Einschaetzung unter diesen Praemissen
+              Verdict-Statement "X % Bewirtschaftung = Y EUR/Jahr — passt/zu knapp/kritisch"
+              + 2-Spalten-Aufschluesselungs-Tabelle (Position / EUR/Jahr) mit Posten
+              Glas-Versicherung, Allgemeinstrom, Versicherungs-Diff, WEG-Verwaltung
+              (mit Berechnungs-Detail), Sigma Laufende Fixkosten, Freier Cashflow
+              fuer Ruecklage.
+        8.5.2 Ruecklagen-Entwicklung
+              4-Spalten-Tabelle Jahr / Bestand Heizung / Aufbau (EUR/J) / Gesamt-Ruecklage
+              ueber 5-7 Jahre bis GEG-Stichtag. Begleitsatz mit Heizungstausch-Bewertung
+              (BEG-Foerderung-Hinweis).
+        8.5.3 Profil fuer Anzeige / Kaeuferansprache
+              Bullet-Liste mit 4-5 Quote-Bausteinen fuer Anzeige + Verdict-Schluss-Satz.
+    - data_sources erweitert um Bewirtschaftungs-Schaetzung-Felder.
+    - Step 1 datensammlung erweitert um Bewirtschaftungs-Posten + Ruecklagen-Pfad
+      + Profil-Bullets.
+    - PageBreak-Liste ergaenzt um Sektion 8.5.
+    Plan-Ref: plans/2026-05-07-modul5-bewirtschaftungs-einschaetzung.md
 
     AENDERUNGEN v1.2 vs v1.1 (2026-05-07):
     - Mietspiegelrechner-Lookup als XML-Block (Bochum + Essen vorbefuellt, erweiterbar)
@@ -94,7 +117,12 @@
       <enthaelt>
         Stammdaten, Bodenrichtwert, Grundstueckswert, WE-Liste, Modernisierungsstand,
         Energieeffizienz, Massnahmen 2026, RND/AfA-Korridor, Mietspiegel-Berechnung,
-        Immometrika-Marktdaten, Mietsubventions-Berechnung pro WE.
+        Immometrika-Marktdaten, Mietsubventions-Berechnung pro WE,
+        v1.3: Bewirtschaftungs-Schaetzung (Quote, Aufschluesselungs-Posten, Sigma
+        Laufende Fixkosten, Freier Cashflow fuer Ruecklage),
+        v1.3: Ruecklagen-Entwicklung (Bestand-Start aus User-Eingabe oder Schaetzung,
+        Aufbau-Jahr, Stichtags-Jahr GEG-Pflichttausch),
+        v1.3: Profil-Bausteine fuer Anzeige (4-5 Quote-Strings, Verdict-Schluss-Satz).
       </enthaelt>
     </source>
     <source name="excel_kalkulation" prio="1" pflicht="ja">
@@ -189,6 +217,39 @@
         - Mietspiegel-Berechnung pro WE (B, C, D, E, F, G, H, K, O)
         - Immometrika (Markt-Median, Vermarktungsdauer, Anzahl)
         - Mietsubvention pro WE (Stufen + Sigma)
+        - v1.3 Bewirtschaftungs-Einschaetzung (fuer Sektion 8.5):
+          - Bewirtschaftungs-Quote in % von Soll-Kalt p.a. (z.B. 20 %)
+          - Bewirtschaftungs-Summe EUR/Jahr (= Quote * Soll-Kalt p.a.)
+          - Verdict-Statement-Text ("passt" / "zu knapp" / "Cashflow-kritisch")
+          - Aufschluesselungs-Posten als Liste:
+            { position, eur_jahr, berechnungs_detail (optional, z.B.
+              "37,50 EUR/WE x 5 WE x 12 Mt") }
+            Posten typisch: Glas-Versicherung, Allgemeinstrom, Versicherungs-Diff,
+            WEG-Verwaltung. Erweiterbar je nach Objekt.
+          - Sigma Laufende Fixkosten EUR/Jahr (= Summe Aufschluesselung)
+          - Freier Cashflow fuer Ruecklage EUR/Jahr (= Bewirtschaftungs-Summe minus
+            Sigma Laufende Fixkosten)
+        - v1.3 Ruecklagen-Entwicklung (fuer Sektion 8.5.2):
+          - Bestand-Start EUR (User-Eingabe oder Schaetzung, z.B. 15.000 EUR
+            als bereits vorhandene Heizungs-Ruecklage)
+          - Aufbau-Jahr EUR (= Freier Cashflow fuer Ruecklage aus 8.5.1)
+          - Start-Jahr (= aktuelles Jahr) bis Stichtags-Jahr (z.B. 2032 GEG-Pflichttausch
+            nach 30-J.-Schwelle, abgeleitet aus Heizungs-Bj. Energieausweis/Schornsteinfeger)
+          - Pro Jahr: Bestand-Anfang, Aufbau, Gesamt-Ruecklage-Ende
+          - Heizungstausch-Bewertung-Satz: "Bei Heizungstausch [JAHR] stehen
+            ~[XX k EUR] zur Verfuegung — deckt Bandbreite [Heizungstyp] ([YY k EUR])
+            [knapp ab/komfortabel ab], abzueglich BEG-Foerderung (i.d.R. 30-40 %)
+            [knapp ab/komfortabel ab]."
+        - v1.3 Profil fuer Anzeige (fuer Sektion 8.5.3):
+          - 4-5 Bullet-Quotes (in Anfuehrungszeichen) zum direkten Verwenden in
+            Anzeige/Kaeuferansprache. Beispiele:
+            "X % Bewirtschaftungskosten inkl. WEG-Verwaltung"
+            "Y EUR Heizungs-Ruecklage beim Hauseigentuemer hinterlegt"
+            "Keine Sanierungsmassnahmen in den naechsten Z Jahren absehbar"
+            "Heizung Bj. [JAHR], technisch einwandfrei — Pflichttausch erst [JAHR] (GEG)"
+          - Verdict-Schluss-Satz (1 Zeile): z.B. "Das ist eine saubere, defensive Story
+            fuer Kapitalanleger. Bestandsruecklage + laufender Aufbau decken den
+            naechsten Grossposten ab — ohne dass der Cashflow gequetscht wird."
         - Risiken (mind. 10 mit Wahrsch. + Schwere + Mitigation)
         - Verdict (GO/GRENZWERTIG/STOP, Verhandlungsziel, Marge-Erwartung)
       </output_struktur>
@@ -307,6 +368,57 @@
         <sektion n="8.2" name="aggregat_treppe">v1.2 NEU: Aggregat-Treppe ueber alle WE — Chart 08b zeigt Summe der monatlichen Stufenmieten ueber Zeit; Hilfslinie SOLL-Total (Sigma Y*F); rosa Flaeche = Sigma Subv. Ersetzt das frueher einzelne WE-01-Treppen-Chart.</sektion>
         <sektion n="8.3" name="pro_we_stufentabelle">v1.2 NEU: Pro WE eine Stufentabelle Format A (6 Spalten: Stufe / Monat-Range / Stufenmiete EUR/Mt / Subv./Mt / Dauer / Sigma Phase EUR) plus Sigma-berechnet-Zeile als Self-Check. Quelle: Modul 4 Step 8 Stufen-Output. Header der Stufentabelle: "WE [Nr] [Lage] - IST [X] EUR/Mt -> SOLL [Y] EUR/Mt - Reach [R] J. - Sigma Subv. [S] EUR". Footer: Formel-Hinweis "Stufe_n+1 = Stufe_n * (1+k) (Cap SOLL); Subv./Mt = SOLL minus Stufenmiete; Sigma Phase = Subv./Mt * Dauer".</sektion>
         <sektion n="8.4">Aggregat-Tabelle + Subventions-Donut (Chart 08a) + Reach-Time-Bar (Chart 08c). Bleibt aus v1.1, nur umnummeriert (war 8.3).</sektion>
+        <sektion n="8.5" name="bewirtschaftungs_einschaetzung">v1.3 NEU: Bewirtschaftungs-Einschaetzung + Ruecklagen-Entwicklung + Profil fuer Anzeige.
+          Konsumiert Bewirtschaftungs-Schaetzung-Felder aus Step 1 datensammlung. Drei Sub-Bloecke:
+
+          8.5.1 EINSCHAETZUNG UNTER DIESEN PRAEMISSEN
+            - H2-Heading "EINSCHAETZUNG UNTER DIESEN PRAEMISSEN"
+            - Verdict-Statement-Zeile als H3-Body (fett): "[Quote] % Bewirtschaftung =
+              [Summe] EUR/Jahr — [passt/zu knapp/kritisch]." Verdict-Wort in Status-Farbe
+              (GRUEN=passt, GELB=zu knapp, ROT=kritisch) als farbig hinterlegtes Span.
+            - 2-Spalten-Tabelle: ["Aufschluesselung" | "EUR/Jahr"]
+              - Pro Aufschluesselungs-Posten eine Zeile (Position als Paragraph CELL,
+                EUR/Jahr rechtsbuendig). Bei Berechnungs-Detail: hinter Position in
+                kleinerer Schrift in Klammern (z.B. "WEG-Verwaltung (37,50 EUR/WE x 5)").
+              - Sigma-Zeile "Laufende Fixkosten" fett (CELL_BOLD), nicht farbig.
+              - Sigma-Zeile "Freier Cashflow fuer Ruecklage" fett (CELL_BOLD), nicht farbig.
+            - colWidths: 11.0 cm Position, 6.0 cm EUR/Jahr (Sigma 17 cm).
+            - Header-BG ORANGE (skill_pdf_export.md v1.1 R4).
+            - KeepTogether mit 8.5.1-Heading + Verdict-Statement + Tabelle.
+
+          8.5.2 RUECKLAGEN-ENTWICKLUNG
+            - H2-Heading "RUECKLAGEN-ENTWICKLUNG"
+            - 4-Spalten-Tabelle: ["Jahr" | "Bestand Heizung" | "Aufbau ([X] EUR/J)" | "Gesamt-Ruecklage"]
+              - X im Header = konkreter Aufbau-Wert pro Jahr (z.B. "3.112 EUR/J").
+              - Pro Jahr eine Zeile von Start-Jahr bis Stichtags-Jahr (z.B. 2026-2032).
+              - Stichtags-Jahr-Zeile mit Suffix "(GEG)" markieren.
+              - Numerische Spalten 2-4 rechtsbuendig (R12).
+              - Zebra ab 4 Zeilen (R11).
+            - colWidths: 2.5 cm Jahr, 4.5 cm Bestand, 4.5 cm Aufbau, 5.5 cm Gesamt-Ruecklage (Sigma 17 cm).
+            - Header-BG ORANGE.
+            - Begleitsatz-Paragraph nach der Tabelle: Heizungstausch-Bewertung mit
+              Hilfslinien-Satz aus Step 1 datensammlung (Pflichttausch-Jahr +
+              BEG-Foerderung-Hinweis).
+            - KeepTogether mit Heading + Tabelle + Begleitsatz.
+
+          8.5.3 PROFIL FUER ANZEIGE / KAEUFERANSPRACHE
+            - H2-Heading "PROFIL FUER ANZEIGE / KAEUFERANSPRACHE"
+            - Bullet-Liste (4-5 Items) — jedes Item als Paragraph BODY mit Quote-Format
+              (Anfuehrungszeichen umschliessend, fett innen wo Kennzahl):
+              - "[Quote] % Bewirtschaftungskosten inkl. WEG-Verwaltung"
+              - "[Bestand-Start EUR] EUR Heizungs-Ruecklage beim Hauseigentuemer hinterlegt"
+              - "Keine Sanierungsmassnahmen in den naechsten [Z] Jahren absehbar"
+              - "Heizung Bj. [Jahr], technisch einwandfrei — Pflichttausch erst [Jahr] (GEG)"
+            - Verdict-Schluss-Paragraph (kursiv, BODY, ACCENT-Farbe als Highlight) nach
+              der Bullet-Liste mit dem Schluss-Satz aus Step 1 datensammlung.
+            - KeepTogether mit Heading + Bullet-Liste + Schluss-Satz.
+
+          STOPP wenn Bewirtschaftungs-Schaetzung-Felder leer: User-Hinweis
+          "Bewirtschaftungs-Schaetzung fehlt im Modul-Output. Vor PDF-Build die
+          Schaetzung im Chat-Output erzeugen (Bewirtschaftungs-Quote, Aufschluesselung,
+          Ruecklagen-Pfad, Profil-Bullets)." Modul 5 fuehrt KEINE eigene Schaetzung
+          durch (gemaess core_rule "Modul 5 fuehrt KEINE Berechnungen durch").
+        </sektion>
         <sektion n="9">Risiko-Heatmap + Risiko-Tabelle</sektion>
         <sektion n="10.1">Verdict-Box + Marge-Sensitivitaet-Linien-Chart + Erklaerung</sektion>
         <sektion n="10.2">Pflicht-Schritte vor Notartermin</sektion>
@@ -315,10 +427,15 @@
       <regel_seitenumbruch>
         Niemals einen Punkt ueber zwei Seiten strecken.
         Wenn moeglich: jeder Unterpunkt eigene Seite.
-        PageBreak vor: Sektion 4, 5.1, 5.3, 6, 7.1, 7.2, 8.2, 8.3, 8.4, 9, 10.1, 10.2, 11.
+        PageBreak vor: Sektion 4, 5.1, 5.3, 6, 7.1, 7.2, 8.2, 8.3, 8.4, 8.5, 9, 10.1, 10.2, 11.
         v1.2: Sektion 8.3 (Pro-WE-Stufentabellen) kann mehrere Seiten umfassen — pro WE
         eine eigene KeepTogether-Box, automatischer PageBreak wenn naechste Tabelle nicht
         mehr passt (siehe skill_pdf_export.md R2 + R9).
+        v1.3: Sektion 8.5 hat drei Sub-Bloecke (8.5.1 Einschaetzung, 8.5.2 Ruecklagen-
+        Entwicklung, 8.5.3 Profil). Jeder Sub-Block ist eigene KeepTogether-Box. Wenn
+        alle drei zusammen auf eine Seite passen: bleiben sie auf einer. Wenn nicht:
+        zwei Bloecke auf Seite 1, dritter Block automatisch auf Seite 2 (kein
+        erzwungener Page-Break zwischen Sub-Bloecken).
       </regel_seitenumbruch>
       <stil>
         <regel>Tabellen bevorzugt vor Fliesstext.</regel>
@@ -328,6 +445,9 @@
         <regel>Excel-Zellen-Bezuege immer mit Sheet-Name und Zelle (z.B. MIETER!M6).</regel>
         <regel>v1.2: Sektion 10.2 (Pflicht-Schritte vor Notar) — Mietspiegel-Aufgabe nutzt URL aus &lt;mietspiegelrechner_lookup&gt;[OBJEKT_GEMEINDE].mietspiegelrechner. Wenn Stadt nicht im Lookup: Hinweis-Cell mit fallback_logik-Text statt klickbarem Link. Bodenrichtwert + Mietspiegel sind ALWAYS-Pflicht-Zeilen (siehe Step 4 pflicht_items_dauerhaft).</regel>
         <regel>v1.2: Tabellen-Header BACKGROUND = ORANGE (#f97316) gemaess skill_pdf_export.md v1.1 R4. Gilt fuer ALLE Tabellen im PDF.</regel>
+        <regel>v1.3: Sektion 8.5.1 Verdict-Statement-Zeile mit farbigem Span: Wort "passt" in GRUEN_BG/GRUEN-Text, "zu knapp" in GELB_BG/GELB-Text, "Cashflow-kritisch" in ROT_BG/ROT-Text (siehe pdf_design farb_schema). Restlicher Statement-Text in Standard-INK-Farbe.</regel>
+        <regel>v1.3: Sektion 8.5.2 Ruecklagen-Tabelle Stichtags-Zeile (z.B. "2032 (GEG)") visuell hervorheben: Zeilen-FONTNAME = Helvetica-Bold. Keine BG-Hervorhebung (sonst Konflikt mit Zebra-Streifen R11).</regel>
+        <regel>v1.3: Sektion 8.5.3 Profil-Bullets — Kennzahlen innerhalb der Quotes fett (Helvetica-Bold via &lt;b&gt;-Tag im Paragraph-XML). Quotes selbst in normalen Anfuehrungszeichen.</regel>
       </stil>
     </step>
 
