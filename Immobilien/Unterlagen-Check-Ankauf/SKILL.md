@@ -41,6 +41,7 @@ Sieben Schritte. Schritt 2 läuft parallel.
 Bevor irgendein Dokument inhaltlich geprüft wird:
 
 1. Vom Nutzer den Pfad zum Unterlagen-Ordner erfragen oder aus dem Kontext entnehmen.
+   - **Mieten-Soll-Quelle parallel suchen** (Pflicht für Wirtschafts-Subagent B2.5): Suche im Objekt-Stammordner (eine Ebene über `Objektunterlagen/`) und in `Objektunterlagen/` selbst nach Aufteiler-Outputs (`Aufteiler_*.pdf`, `Kalkulation_*.xlsx`) und nach Soll-Mieten-Aufstellungen. Suchmuster case-insensitive: `mietmatrix`, `mietaufstellung`, `mietenliste`, `mietenübersicht`, `mieten gesamt`, `mietenspiegel-objekt`, `rent roll`. Wenn keine Quelle gefunden: frage den User nach Soll-Aufstellung oder Screenshot. Bei vorhandenem Aufteiler-Output: Soll-Mieten daraus ziehen, gegen Einzel-Mietverträge validieren (Quercheck Ist vs. Soll pro WE). Ergebnis als `MIETEN_SOLL_QUELLE` + `MIETEN_SOLL_PRO_WE` (Tabelle: WE | Wohnfläche | Soll-Kalt €/Mt) in den Standort-Block aufnehmen — geht als Pflicht-Input in Schritt 4.5 ein.
 2. Ordnerinhalt auflisten (Bash `ls`, `find`).
 3. **Pre-Flight-Klassifizierung** via `tools/pdf_classify.py`:
    - Pro PDF: Größe + Text-Layer-Probe (pdftotext, >100 Bytes Output) + Split-Bedarf
@@ -347,16 +348,31 @@ INPUTS:
 - Standort-Live-Variablen aus Schritt 1: {STANDORT_BLOCK}
 - User-Eingaben: KAUFPREIS_EUR, GRUNDSTUECKSFLAECHE_M2, EXPOSE_RENDITE_ANNAHME,
   BESTAND_RUECKLAGE_EUR, AUFTEILER_STRATEGIE
+- Mieten-Soll-Basis (Pflicht fuer B2.5):
+  - MIETEN_SOLL_QUELLE: {Pfad Aufteiler-Output Kalkulation_*.xlsx /
+    Aufteiler_*.pdf / Mietaufstellung}
+  - MIETEN_SOLL_PRO_WE: {Tabelle pro WE — Wohnflaeche m² | Soll-Kalt €/Mt
+    | Soll-Kalt €/Jahr}
+  - MIETEN_IST_PRO_WE: {Tabelle pro WE aus Subagent 06-mietvertrag —
+    Ist-Kalt €/Mt, nur als Quercheck-Spalte}
 - Subagent-Outputs Schritt 2: {ALLE_KERNDATEN_UND_BEFUNDE}
 - Quercheck-Tabelle Schritt 3: {QUERCHECK_TABELLE}
 
 AUFTRAG:
 Wende das Profi-Protokoll vollstaendig an. Liefere alle Bloecke
-B1-B9 (Gebaeudeanteil, Vermieter-NK, Aufteiler-Kosten, Ruecklagen-
-Empfehlung, Mieter-NK, BK-Luecken-Hebel, Mietsteigerung, CapEx
-Best/Real/Worst, Cashflow-Kurve).
+B1, B2, B2.5, B3, B4, B5, B6, B7, B8, B9 (Gebaeudeanteil, Vermieter-NK,
+Bewirtschaftungskosten Hausgesamt + pro WE, Aufteiler-Kosten,
+Ruecklagen-Empfehlung, Mieter-NK, BK-Luecken-Hebel, Mietsteigerung,
+CapEx Best/Real/Worst, Cashflow-Kurve).
 
-Output-Schema steht im Profi-Protokoll. Jede Zahl mit Quelle.
+Liefere B2.5 in beiden Sichten (Hausgesamt + pro WE), Bezugsgroesse
+Soll-Kalt p.a. ohne Garagen. Soll-Mieten sind alleinige Berechnungsbasis,
+Ist-Mieten nur Quercheck-Spalte. Keine geschaetzten Mieten.
+Verteilerschluessel pro WE aus BK-/Heizkostenabrechnung uebernehmen,
+keine Eigenkonstruktion.
+
+Output-Schema steht im Profi-Protokoll. Jede Zahl mit Quelle
+[datei.pdf, S. X] oder [Kalkulation_*.xlsx, Tab X].
 Annahmen explizit als "Annahme" markieren.
 ```
 
@@ -490,8 +506,24 @@ Bei eindeutigen Deal-Killern (z. B. laufende Förderbindung + Aufteiler-Ziel, un
 ## Wirtschaftliche Validierung
 
 [Output des Wirtschafts-Subagents aus Schritt 4.5 — vollständig integrieren:
- B1 Gebäudeanteil, B2 Vermieter-NK, B3 Aufteiler-Kosten, B4 Rücklagen,
- B5 Mieter-NK, B6 BK-Lücken, B7 Mietsteigerung, B8 CapEx, B9 Cashflow]
+ B1 Gebäudeanteil, B2 Vermieter-NK, B2.5 Bewirtschaftung, B3 Aufteiler-Kosten,
+ B4 Rücklagen, B5 Mieter-NK, B6 BK-Lücken, B7 Mietsteigerung, B8 CapEx, B9 Cashflow]
+
+### Hausgesamt-Sicht (Investor)
+
+[B2.5 Sicht A: Bucket-Tabelle mit drei Cases, Σ Bewirtschaftung,
+ % Soll-Kalt p.a. (ohne Garagen), Vermieter-Quote nicht umlagefähig.
+ Garagen-Beitrag separat. Verdict: tragfähig / zu knapp / Cashflow-kritisch.]
+
+### Pro WE-Sicht (Kapitalanleger)
+
+[B2.5 Sicht B: drei Block-Tabellen (Best, Real, Worst), alle WE als Zeilen,
+ Spalten Wohnfläche, Soll-Kalt p.a., Rücklage-Anteil, Umlagefähig-Anteil,
+ Nicht umlagefähig (a+b+c+d), Σ Bewirtschaftung, % Soll-Kalt,
+ Vermieter-Quote nicht umlagefähig. Verteilerschlüssel aus BK-/Heizkosten-
+ Abrechnung. Verdict pro Median-WE + namentliche Nennung kritischer WE.
+ Letzte Tabelle: Verbindung Mieter-Umlage ↔ Vermieter-Eigenanteil
+ mit Σ-Hebel-Zeile (Verlinkung zu B6).]
 
 ---
 

@@ -24,15 +24,21 @@ Aus Schritt 1 (Inventur + User-Eingaben):
 - `EXPOSE_RENDITE_ANNAHME` (sofern Exposé vorhanden, sonst `nicht angegeben`)
 - `BESTAND_RUECKLAGE_EUR` (Hausgeldkonto-Bestand, sofern bekannt)
 
+Aus Schritt 1 — Mieten-Soll-Basis (Pflicht für B2.5):
+- `MIETEN_SOLL_QUELLE`: Pfad zum Aufteiler-Output (`Kalkulation_*.xlsx`, `Aufteiler_*.pdf`) oder zur Mietaufstellung. Wenn nicht vorhanden: User-Rückfrage in Schritt 1.
+- `MIETEN_SOLL_PRO_WE`: Tabelle pro WE mit Wohnfläche m² + Soll-Kalt €/Monat (+ €/Jahr abgeleitet).
+- `MIETEN_IST_PRO_WE`: Tabelle pro WE mit Ist-Kalt €/Monat aus Subagent 06-mietvertrag (Quercheck-Spalte, **nicht** Berechnungsbasis).
+
 Aus Subagent-Outputs (Schritt 2):
-- Mietverträge → Ist-Kalt-Mieten + NK-VZ
+- Mietverträge → Ist-Kalt-Mieten + NK-VZ (Quercheck zu MIETEN_SOLL_PRO_WE)
 - Mietmatrix → Mieterstruktur
 - Energieausweis → Bj., Wärmeerzeuger, Energieträger
 - Bauakte → tatsächliches Baujahr (kann von Bestands-Bj. abweichen)
-- BK-Abrechnung → umgelegte vs. nicht umgelegte Kosten
+- BK-Abrechnung → umgelegte vs. nicht umgelegte Kosten + **Verteilerschlüssel pro WE** (B2.5-Pflicht)
+- Heizkostenabrechnung → Brennstoffkosten, Verbrauch + Heizkosten-Verteilerschlüssel
 - Versicherung → Police-Daten
-- Heizkostenabrechnung → Brennstoffkosten, Verbrauch
 - Wartungsverträge → Wartungskosten
+- Hausgeldabrechnung → WE-Schlüssel für WEG-/SEV-Verteilung
 - Grundbuch / Grundsteuer → Grundsteuer-Belastung
 
 Aus Live-Recherche (zentral durch Hauptagent in Schritt 1):
@@ -94,6 +100,147 @@ Tatsächliche Kosten aus BK-Abrechnung + Versicherungsrechnungen + Allgemeinstro
 
 Plus: Eigenanteil als **€/m²·a** und **€/m²·Mt**.
 
+### B2.5 · Bewirtschaftungskosten — Hausgesamt + pro WE
+
+Synthetisiert die tatsächliche Vermieter-Belastung aus realen Unterlagen (BK-Abrechnungen, Versicherung, Wartung, Allgemeinstrom, Hausgeld) in **zwei Sichten**:
+
+- **Sicht A — Hausgesamt** für den Investor (Cashflow-Träger des Gesamtobjekts).
+- **Sicht B — pro WE** für den späteren Kapitalanleger im Wiederverkaufs-Exposé (Aufteiler-Szenario).
+
+**Bezugsgröße aller Quoten**: Soll-Kalt-Miete pro Jahr (ohne Garagen). Soll-Mieten kommen aus dem Aufteiler-Output (`Kalkulation_*.xlsx`, `Aufteiler_*.pdf`) oder einer übergebenen Mietaufstellung. Ist-Mieten dienen ausschließlich als Quercheck-Spalte.
+
+#### Drei Buckets
+
+**Bucket 1 — Rücklagen**: Übernahme aus B4 (gewählter Ansatz). Pro WE nach Wohnflächen-Schlüssel der BK-Abrechnung verteilt.
+
+**Bucket 2 — Betriebskosten umlagefähig**: pro Position € pro Jahr aus NK-Abrechnungen aller WE, plus Spalte „theoretisch maximal umlegbar" (Übernahme aus B6 BK-Lücken-Hebel).
+
+| Position (BetrKV § 2) | Aktuell umgelegt €/Jahr | Theoretisch max. umlegbar €/Jahr | Quelle |
+|---|---|---|---|
+| Grundsteuer (Nr. 1) | … | … | [bk_<we>.pdf, S. X] |
+| Wasserversorgung (Nr. 2) | … | … | … |
+| Entwässerung (Nr. 3) | … | … | … |
+| Heizung + Warmwasser (Nr. 4–6) | … | … | [heizkosten_<jahr>.pdf] |
+| Aufzug (Nr. 7) | … | … | … |
+| Müllbeseitigung (Nr. 8) | … | … | … |
+| Hausreinigung (Nr. 9) | … | … | … |
+| Gartenpflege (Nr. 10) | … | … | … |
+| Allgemeinstrom (Nr. 11) | … | … | … |
+| Schornsteinfeger (Nr. 12) | … | … | … |
+| Sach- + Haftpflichtversicherung (Nr. 13) | … | … | [police.pdf] |
+| Hauswart (Nr. 14) | … | … | … |
+| Sonstige (Nr. 17) | … | … | … |
+| **Σ Bucket 2** | **Σ aktuell** | **Σ max.** | |
+
+**Bucket 3 — Nicht umlagefähige Kosten** (Vermieter-Eigenanteil):
+
+- **(a) WEG-Verwaltung** — Pflichtkosten nach § 26 WEG. Marktwert für `OBJEKT_GEMEINDE` live recherchieren (DDIV-Honorartabelle als bundesweiter Fallback, Stand-Datum + URL pflichtig). **Output-Format: Prozentsatz**, in Sicht A bezogen auf Hausgesamt-Soll-Kalt p.a., in Sicht B bezogen auf WE-Soll-Kalt p.a.
+- **(b) Sondereigentumsverwaltung (SEV)** — optional, nur wenn Aufteiler-Strategie + externe SEV vorgesehen. **Output-Format: Eurobetrag pro Jahr**, typisch 25–35 € pro WE pro Monat × 12.
+- **(c) Rücklage** — Übernahme aus Bucket 1.
+- **(d) Alles Weitere**:
+  - Mietausfallwagnis (Quote pro Case)
+  - Bankgebühren Mietkonto
+  - Steuerberater
+  - Instandhaltung Sondereigentum (nicht von Rücklage gedeckt)
+  - nicht-umlagefähige Versicherungsanteile (Haus- und Grundbesitzer-Haftpflicht, soweit Vermieter-Block in Police)
+  - nicht-umlagefähige Wartungsanteile (Reparatur-Anteil ≠ Wartungsumlage nach BGH VIII ZR 41/09)
+  - Leerstandskalkulation (BK-Anteil leerer WE)
+  - Sonstige Verwaltungskosten (Software, Porto, Mitgliedsbeiträge)
+
+#### Drei Cases — Annahmen pro Spalte
+
+| Annahme | Best | Realistisch | Worst |
+|---|---|---|---|
+| Mietausfall-Quote (% Soll-Kalt) | 1,0 % | 2,5 % | 5,0 % |
+| WEG-Verwaltung (% Soll-Kalt) | DDIV-Untergrenze live | DDIV-Mittelwert live | DDIV-Obergrenze live |
+| SEV €/WE/Monat | 0 (keine SEV) | 25 € | 35 € |
+| Rücklagen-Ansatz | B4 schlank | B4 Standard | B4 hoch |
+| Bank/StB/Software | 0,3 % Soll-Kalt | 0,8 % Soll-Kalt | 1,5 % Soll-Kalt |
+| Reparatur-Anteil Wartung | 10 % Wartungssumme | 25 % Wartungssumme | 40 % Wartungssumme |
+
+Annahmen pro Case explizit als „Annahme" markieren. Live-Recherche-Werte mit URL + Stand.
+
+#### Sicht A — Hausgesamt
+
+| Bucket / Position | Best €/Jahr | Realistisch €/Jahr | Worst €/Jahr |
+|---|---|---|---|
+| Bucket 1 — Rücklage | … | … | … |
+| Bucket 2 — Σ umlagefähige BK | … | … | … |
+| Bucket 3a — WEG-Verwaltung | … | … | … |
+| Bucket 3b — SEV | … | … | … |
+| Bucket 3c — Rücklage (= Bucket 1) | (siehe oben) | (siehe oben) | (siehe oben) |
+| Bucket 3d — Mietausfallwagnis | … | … | … |
+| Bucket 3d — Bank/StB/Software | … | … | … |
+| Bucket 3d — Reparatur Sondereigentum | … | … | … |
+| Bucket 3d — nicht-umlagefähige Versicherungsanteile | … | … | … |
+| Bucket 3d — Reparatur-Anteil Wartung | … | … | … |
+| Bucket 3d — Leerstandskalkulation BK | … | … | … |
+| Garagen-Beitrag (separat, nicht im %-Nenner) | … | … | … |
+| **Σ Bewirtschaftung** | **Σ Best** | **Σ Real** | **Σ Worst** |
+| % von Soll-Kalt p.a. (ohne Garagen) | … % | … % | … % |
+| Vermieter-Quote nicht umlagefähig (% Soll-Kalt) | … % | … % | … % |
+
+#### Sicht B — pro WE
+
+Drei Block-Tabellen (Best / Realistisch / Worst), jeweils alle WE als Zeilen.
+
+**Block Best-Case**:
+
+| WE | Wohnfläche m² | Soll-Kalt €/Jahr | Rücklage €/Jahr | Umlagefähig €/Jahr | Nicht umlagefähig (a+b+c+d) €/Jahr | Σ Bewirtschaftung €/Jahr | % Soll-Kalt | Vermieter-Quote nicht umlagefähig % |
+|---|---|---|---|---|---|---|---|---|
+| WE1 | … | … | … | … | … | … | … % | … % |
+| WE2 | … | … | … | … | … | … | … % | … % |
+| … | … | … | … | … | … | … | … % | … % |
+| **Σ Hausgesamt** | … | … | … | … | … | … | … % | … % |
+
+**Block Realistisch-Case**: identische Struktur, alle Werte für Realistisch.
+
+**Block Worst-Case**: identische Struktur, alle Werte für Worst.
+
+**Verteilerschlüssel pro WE — zwingend aus realen Unterlagen**:
+
+- Wohnflächen-Anteil aus BK-Abrechnung übernehmen (Spalte Anteil m² oder %).
+- Pro-WE-Posten (Müll, Aufzug, Hauswart) mit dem dort verwendeten Schlüssel.
+- Heizung + Warmwasser aus Heizkostenabrechnung (Verbrauch + Grundkosten getrennt).
+- WEG-Verwaltung + SEV nach WE-Schlüssel der Hausgeldabrechnung (sofern vorhanden) oder sonst nach Wohnfläche.
+
+**Eigene Schlüssel-Setzung verboten**. Wenn Schlüssel fehlt: Status pro Position `nicht_pruefbar`, Hinweis im Verdict.
+
+**Garagen**: separat als Zeile „Garagen-Beitrag", **nicht** im %-Nenner der Soll-Kalt-Quoten.
+
+#### Verbindung Mieter-Umlage ↔ Vermieter-Eigenanteil (Pflicht-Tabelle)
+
+Verlinkt B2.5 mit B6 (BK-Lücken-Hebel). Pro BK-Position eine Zeile.
+
+| BK-Position | Police-/Rechnungs-Wert €/Jahr | Aktuell umgelegt €/Jahr | Vermieter-Eigenanteil €/Jahr | Umlegbar nach Übernahme | BetrKV-Norm | Quelle |
+|---|---|---|---|---|---|---|
+| Wohngebäude-Versicherung | … | … | … | ja | § 2 Nr. 13 | [police.pdf] |
+| Haus- und Grundbesitzer-Haftpflicht | … | … | … | ja, sofern in Vertrag | § 2 Nr. 13 | [police.pdf] |
+| Glas-/Sonderversicherung | … | … | … | teilweise | § 2 Nr. 13 | [police.pdf] |
+| Allgemeinstrom Treppenhaus | … | … | … | ja | § 2 Nr. 11 | [bk_<we>.pdf] |
+| Hausreinigung | … | … | … | ja | § 2 Nr. 9 | [bk_<we>.pdf] |
+| Gartenpflege | … | … | … | ja | § 2 Nr. 10 | [bk_<we>.pdf] |
+| Wartung Heizung (Vermieter-Reparaturanteil) | … | … | … | nein | BGH VIII ZR 41/09 | [wartung.pdf] |
+| … | … | … | … | … | … | … |
+
+Σ-Zeile mit Vermieter-Eigenanteil gesamt + dem Anteil davon, der **nach Übernahme umlegbar** wird (= B6 Hebel).
+
+#### Headline-Kennzahlen (am Block-Ende, einzeilig)
+
+| Kennzahl | Wert |
+|---|---|
+| Bewirtschaftungs-Quote Real-Case Hausgesamt | … % von Soll-Kalt p.a. |
+| Vermieter-Quote nicht umlagefähig Real-Case Hausgesamt | … % von Soll-Kalt p.a. |
+| Vermieter-Quote nicht umlagefähig Real-Case pro WE (Median) | … % von WE-Soll-Kalt p.a. |
+| Vermieter-Quote nicht umlagefähig Real-Case pro WE (max.) | … % (WE: …) |
+
+Die letzte Kennzahl ist die zentrale Kapitalanleger-Größe für Wiederverkaufs-Exposé pro WE.
+
+#### Verdict pro Sicht
+
+- **Sicht A — Hausgesamt**: tragfähig / zu knapp / Cashflow-kritisch. Eine Zeile Begründung mit Bezug auf Bewirtschaftungs-Quote + Vermieter-Quote.
+- **Sicht B — pro WE**: tragfähig / zu knapp / Cashflow-kritisch (Median-WE). Wenn ≥1 WE als „Cashflow-kritisch" auffällt, namentlich nennen. Eine Zeile Begründung.
+
 ### B3 · Aufteiler-Kosten (nur falls Aufteiler-Strategie)
 
 Pro Aufteilungs-Szenario (siehe `aufteiler-risiken.md` Szenario A/B):
@@ -140,13 +287,7 @@ Vergleich:
 
 Differenz konkret in Euro pro Monat ausweisen — das ist die wirtschaftliche Realität gegenüber dem Anzeigen-Versprechen.
 
-#### B4c — Bewirtschaftungskosten-Realitätscheck (3-Zeilen-Block)
-
-- Anzeige sagt: **X %** (Begründung wenn vorhanden)
-- DIN 18960 / Marktpraxis Bj.-Klasse: **Y %**
-- Für DIESES Objekt empfohlen: **Z %** (Begründung mit Stolpersteinen aus B2)
-
-Verdict: **tragfähig** / **zu knapp** / **Cashflow-kritisch**.
+> **Hinweis**: Der Bewirtschaftungs-Realitätscheck (Anzeige vs. DIN 18960 vs. Objekt-Empfehlung) ist in B2.5 absorbiert. B2.5 liefert den vollständigen Vergleich in zwei Sichten (Hausgesamt + pro WE) mit Quoten gegen Soll-Kalt p.a.
 
 ### B5 · Mieter-Nebenkosten (Mieter-Sicht)
 
@@ -248,6 +389,19 @@ Dieser Subagent zieht aus folgenden Wechselwirkungen seine Inputs:
 ### B2 · Vermieter-Nebenkosten effektiv
 [Tabelle B2]
 
+### B2.5 · Bewirtschaftungskosten — Hausgesamt + pro WE
+[Annahmen-Tabelle Best/Real/Worst]
+#### Sicht A — Hausgesamt
+[Tabelle mit Buckets 1+2+3 + Σ Bewirtschaftung + 2 Quoten-Zeilen]
+#### Sicht B — pro WE (drei Block-Tabellen)
+[Block Best-Case: alle WE als Zeilen]
+[Block Realistisch-Case: alle WE als Zeilen]
+[Block Worst-Case: alle WE als Zeilen]
+#### Verbindung Mieter-Umlage ↔ Vermieter-Eigenanteil
+[Pflicht-Tabelle pro BK-Position, Σ-Zeile mit B6-Hebel]
+#### Headline-Kennzahlen
+[Tabelle mit 4 Kennzahlen + Verdict pro Sicht]
+
 ### B3 · Aufteiler-Kosten
 [Tabelle B3, falls relevant]
 
@@ -257,8 +411,6 @@ Dieser Subagent zieht aus folgenden Wechselwirkungen seine Inputs:
 [Tabelle B4a]
 #### B4b Cashflow-Impact
 [Tabelle B4b]
-#### B4c Bewirtschaftungs-Realitätscheck
-[3-Zeilen-Block + Verdict]
 
 ### B5 · Mieter-Nebenkosten
 [Tabelle B5 + § 560-Anpassungspotenzial + Marktbenchmark]
@@ -285,5 +437,11 @@ Dieser Subagent zieht aus folgenden Wechselwirkungen seine Inputs:
 3. Bei fehlenden Werten: explizit `Annahme` markiert und konservativen Default genutzt?
 4. Plausibilität: Gebäudeanteil 50–90 %? Bewirtschaftung > Anzeige + Lücken-Hebel ausgewiesen?
 5. Förderbindungs-KO aus Quercheck W7 berücksichtigt?
+6. **B2.5**: Sind beide Sichten (Hausgesamt + pro WE) geliefert? Bezugsgröße aller Quoten = Soll-Kalt p.a. ohne Garagen?
+7. **B2.5**: Soll-Mieten aus realer Quelle (Aufteiler-Output / Mietaufstellung) — keine geschätzten Mieten? Ist-Mieten nur als Quercheck-Spalte?
+8. **B2.5**: Verteilerschlüssel pro WE aus BK-/Heizkostenabrechnung übernommen — keine Eigenkonstruktion?
+9. **B2.5**: WEG-Verwaltung als **% Soll-Kalt**, SEV als **€/Jahr** — Format eingehalten?
+10. **B2.5**: Garagen separat ausgewiesen, **nicht** im %-Nenner?
+11. **B2.5**: Verbindung Mieter-Umlage ↔ Vermieter-Eigenanteil als Pflicht-Tabelle vorhanden, Σ-Zeile mit B6-Hebel?
 
 Wenn eine Frage mit "nein" beantwortet: Output zurückstellen und korrigieren.
