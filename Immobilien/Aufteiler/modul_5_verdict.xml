@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<modul name="Verdict-Export" id="5" version="1.1" language="de">
+<modul name="Verdict-Export" id="5" version="1.2" language="de">
 
   <!--
     MODUL 5 - VERDICT-EXPORT (PDF + Excel-Notizen)
@@ -26,6 +26,19 @@
     - Module 0-4 muessen durchgelaufen sein (Outputs in Chat-Kontext)
     - Excel Kalkulation_Aufteiler ist befuellt
     - Wenn nicht: STOPP, User-Hinweis "Erst Module 0-4 ausfuehren".
+
+    AENDERUNGEN v1.2 vs v1.1 (2026-05-07):
+    - Mietspiegelrechner-Lookup als XML-Block (Bochum + Essen vorbefuellt, erweiterbar)
+    - To-do-Liste Sektion 1: Bodenrichtwert + Mietspiegel sind ALWAYS-Pflicht-Items
+    - Mietsubvention pro WE als Stufentabelle Format A (Stufe / Monat-Range / Stufenmiete /
+      Subv./Mt / Dauer / Sigma Phase) + Aggregat-Treppe ueber alle WE statt nur WE 01
+    - Sektion 3 Stammdaten: Gebaeudewert nach ImmoWertV-Sachwertverfahren (4 Bloecke)
+      statt vereinfachter Methode (KP minus Bodenwert). Inputs: BGF, NHK_2010, Sachwertfaktor
+      kommen aus Modul 1 v1.1
+    - Cover-Headline: "Analyse zur Aufteiler-Kalkulation [STRASSE]" statt "AUFTEILER-VERDICT"
+      (PDF-title-Metadatum gleich)
+    - Skill-PFLICHT auf skill_pdf_export.md v1.1 hochgezogen (Tabellen-Header Orange)
+    Plan-Ref: plans/2026-05-07-modul5-pdf-export-anpassung.md
 
     AENDERUNGEN v1.1 vs v1.0:
     - PFLICHT-Verweis auf skill_pdf_export.md fuer Layout-Regeln
@@ -104,6 +117,32 @@
   </data_sources>
 
   <!-- ============================================================ -->
+  <!-- MIETSPIEGELRECHNER-LOOKUP (v1.2)                              -->
+  <!-- ============================================================ -->
+  <mietspiegelrechner_lookup>
+    <hinweis>
+      Stadt-zu-URL-Mapping fuer Mietspiegelrechner. Wird in Step 5 PDF-Sektion 1
+      (Aufgaben To-Do's vor Notar) konsumiert: Aufgabe "Mietspiegel verifizieren"
+      zieht die URL aus diesem Lookup. Bei unbekannter Stadt: Hinweis-Cell statt stilles Weglassen.
+      Liste erweiterbar — neue Staedte einfach als <stadt>-Element ergaenzen.
+    </hinweis>
+    <stadt name="Bochum">
+      <mietspiegelrechner>https://www.bochum.de/C125830C0042AB74/vwContentByKey/W2DFQALM601BOCMDE/$File/MSR_2025.html</mietspiegelrechner>
+      <mietspiegel_uebersicht>https://www.bochum.de/amt-fuer-stadtplanung-und-wohnen/Dienstleistungen-und-Infos/Mietspiegel</mietspiegel_uebersicht>
+    </stadt>
+    <stadt name="Essen">
+      <mietspiegelrechner>https://formulare.essen.de/metaform/Form-Solutions/?2&amp;releaseUserId=05113000-0001-0005&amp;releaseID=5f9be026e4b01507f808d2eb&amp;releaseOrganizationID=05113000-0001&amp;assistant=KFAS_68-Mietspiegelrechner&amp;storable=false&amp;fileUrl=https%253A%252F%252Fformulare.essen.de%252Fmetaform%252FForm-Solutions%252Fsid%252Fassistant%252F5f9be026e4b01507f808d2eb%253FcacheID%253D0b165adb-8993-498b-b6ff-f4696d0b53cd&amp;oID=05113000-0001&amp;cacheID=4154dbf6-a4c5-49c1-8f69-d4d023a7625e&amp;kdnr=05113000-0001</mietspiegelrechner>
+      <mietspiegel_uebersicht>https://www.essen.de/leben/wohnen/mietspiegel.de.html</mietspiegel_uebersicht>
+    </stadt>
+    <fallback_logik>
+      Wenn OBJEKT_GEMEINDE nicht im Lookup vorhanden:
+      Aufgaben-Cell-Text = "Mietspiegelrechner-URL fuer [Stadt] recherchieren — keine fixe URL hinterlegt.
+      Bei Mietspiegel-Stadt-Pages oft direkt verlinkt. Lookup-Block bei Bedarf erweitern."
+      Kein PDF-Build-Crash — die To-do-Zeile bleibt sichtbar mit Hinweis statt Link.
+    </fallback_logik>
+  </mietspiegelrechner_lookup>
+
+  <!-- ============================================================ -->
   <!-- WORKFLOW                                                      -->
   <!-- ============================================================ -->
   <workflow>
@@ -165,7 +204,7 @@
         <chart n="06" name="afa_gauge" typ="gauge_h">AfA-Korridor mit 3 Markern (ImmoWertV/Standard/Festlegung)</chart>
         <chart n="07" name="mietspiegel_val" typ="bar_v">K/M6/Markt-Median/MPB-Cap</chart>
         <chart n="08a" name="subv_donut" typ="donut">Subventions-Beitrag pro WE</chart>
-        <chart n="08b" name="steigerung_step" typ="step_multi">Mietsteigerungs-Pfad pro WE Stufenfunktion</chart>
+        <chart n="08b" name="steigerung_step_aggregat" typ="step">v1.2: Mietsteigerungs-Pfad Aggregat ueber alle WE (Summe der monatlichen Stufenmieten Mt 0..maxReach; Hilfslinie SOLL-Total = Sigma Y_we * F_we; rosa Flaeche = Sigma Subv). Vorher: pro WE einzeln nur fuer WE 01.</chart>
         <chart n="08c" name="reach_time" typ="bar_h">Reach-Time pro WE</chart>
         <chart n="09" name="risk_heatmap" typ="heatmap_3x3">Risiko Wahrsch. x Schwere mit Risiko-Nummern</chart>
         <chart n="10" name="marge_sensitivity" typ="line">Marge vs. Verhandlungs-KP</chart>
@@ -198,10 +237,27 @@
 
     <step n="4" name="verdict_aufbereiten">
       <task>Verdict-Block mit Verhandlungs-Korridor + Pflicht-Schritten.</task>
+      <pflicht_items_dauerhaft>
+        <hinweis>
+          v1.2: Diese zwei Items MUESSEN immer in der Pflicht-Schritte-Tabelle stehen,
+          auch wenn intern als "verifiziert" markiert. Sie validieren die zentralen
+          Aufteiler-Annahmen Bodenrichtwert + Mietspiegel-Wohnlage.
+        </hinweis>
+        <item nr="1" prioritaet="PFLICHT">
+          BORIS.NRW Bodenrichtwert fuer [Strasse] verifizieren (Annahme [X] EUR/m^2).
+          Quelle/Tool: boris.nrw.de/borisplus
+        </item>
+        <item nr="2" prioritaet="PFLICHT">
+          Wohnlage [Stadt] fuer [Strasse] bestimmen (Annahme [Lage Klasse]).
+          Quelle/Tool: Mietspiegelrechner-URL aus &lt;mietspiegelrechner_lookup&gt;[OBJEKT_GEMEINDE].mietspiegelrechner.
+          Falls OBJEKT_GEMEINDE nicht im Lookup: Hinweis-Text aus fallback_logik
+          (statt klickbarem Link).
+        </item>
+      </pflicht_items_dauerhaft>
       <output>
         Verdict (GO/GRENZWERTIG/STOP), Verhandlungsziel, Marge-Erwartung, Halte-Phase,
-        Pflicht-Schritte-Tabelle vor Notartermin (Wohnlage, BORIS, Sachverstaendiger,
-        SteuerB, Excel, Besichtigung, Mieterliste, Verhandlung).
+        Pflicht-Schritte-Tabelle vor Notartermin (BORIS [Pflicht], Mietspiegel [Pflicht],
+        Sachverstaendiger, SteuerB, Excel, Besichtigung, Mieterliste, Verhandlung).
       </output>
     </step>
 
@@ -224,10 +280,22 @@
         R13 VALIGN TOP bei Word-Wrap, MIDDLE bei Kurztexten
       </pflicht_skill_regeln>
       <pdf_struktur>
-        <sektion n="cover">Titel + Adresse + Hebel-Kaskade-Chart + GO-Verdict-Box</sektion>
+        <sektion n="cover" name="cover">v1.2: Headline "Analyse zur Aufteiler-Kalkulation [STRASSE]" (frueher "AUFTEILER-VERDICT"). Variable [STRASSE] = OBJEKT_STRASSE aus Modul 1 Stammdaten (z.B. "Prosperstrasse 59"). Aufbau: Headline gross (H1, INK), darunter Adresse + Kompakt-Stammdaten (n-Familienhaus, m^2, BJ, Substanz, Garagen), darunter Hebel-Kaskade-Chart 00, darunter GO/GRENZ/STOP-Verdict-Box. PDF-Metadatum title (SimpleDocTemplate-Argument) = gleicher Wortlaut wie Headline.</sektion>
         <sektion n="1">Stammdaten</sektion>
         <sektion n="2">Bodenrichtwert</sektion>
-        <sektion n="3">Grundstueckswert + Gebaeudeanteil + Donut</sektion>
+        <sektion n="3" name="gebaeudewert_sachwertverfahren">v1.2: Gebaeudewert nach ImmoWertV-Sachwertverfahren (Anlage 4 ImmoWertV 2021) statt vereinfacht KP minus Bodenwert.
+          Block 1 — Bodenwert: Bodenrichtwert * Grundstuecksflaeche.
+          Block 2 — Gebaeudesachwert (vorlaeufig): NHK_2010_indexiert * BGF * (1 - Alterswertminderung) * Modernisierungsfaktor.
+                    Alterswertminderung = (GA / GND) * (1 - Modernisierungspunkte / 20), Werte aus Modul 3 RND-Modell.
+                    NHK_2010_indexiert = NHK_2010 * BKI_Index_2026/2010.
+          Block 3 — Marktangepasster Sachwert: (Bodenwert + Gebaeudesachwert) * Sachwertfaktor (aus GMB Stadt-Subpage oder Default 1,0).
+          Block 4 — Boden-Gebaeude-Verteilung des Kaufpreises: Gebaeude-KP-Anteil = KP * Gebaeudesachwert / (Bodenwert + Gebaeudesachwert).
+                    Plausi-Check 50-90 % (wie bisher; Hinweis-Text bei Verletzung).
+          Donut (chart 03 grundstueck_donut) visualisiert die finale Boden-Gebaeude-Verteilung des KP.
+          Inputs aus Modul 1 v1.1: Bodenrichtwert, Grundstuecksflaeche, BGF, NHK_2010, BKI-Index 2026, Sachwertfaktor.
+          Plus Modernisierungspunkte aus Modul 3.
+          STOPP wenn BGF oder NHK_2010 fehlen — User-Hinweis "ImmoWertV-Sachwertverfahren benoetigt BGF + NHK-2010, Inputs in Modul 1 v1.1 ergaenzen (siehe docs/modul_1_objektbasis.md)".
+        </sektion>
         <sektion n="4">WE-Liste + IST-vs-SOLL-Chart</sektion>
         <sektion n="5.1">Modernisierungsstand IST sortiert nach Farbe GRUEN-zu-ROT, Hintergrund-Farben pro Status</sektion>
         <sektion n="5.2">Energieeffizienz</sektion>
@@ -235,9 +303,10 @@
         <sektion n="6">RND + AfA-Gauge + Korridor-Erklaerung</sektion>
         <sektion n="7.1">Mietspiegel-Berechnung pro WE + ausgeschriebene Spalten-Legende (B/C/D/E/F/G/H/K/O)</sektion>
         <sektion n="7.2">M6-Mittelwert + Markt-Validation + Excel-Zelle-Erklaerung</sektion>
-        <sektion n="8.1">Mietsubvention Annahmen</sektion>
-        <sektion n="8.2">Mietsteigerungs-Pfad Step-Chart</sektion>
-        <sektion n="8.3">Aggregat-Tabelle + Subventions-Donut + Reach-Time-Bar</sektion>
+        <sektion n="8.1">Mietsubvention Annahmen (3 Mo Anlauf + 36 Mo-Stufen, k = Kappungsgrenze stadtspezifisch, Cap je WE = Y_we * F_we, Garagen ausgeschlossen)</sektion>
+        <sektion n="8.2" name="aggregat_treppe">v1.2 NEU: Aggregat-Treppe ueber alle WE — Chart 08b zeigt Summe der monatlichen Stufenmieten ueber Zeit; Hilfslinie SOLL-Total (Sigma Y*F); rosa Flaeche = Sigma Subv. Ersetzt das frueher einzelne WE-01-Treppen-Chart.</sektion>
+        <sektion n="8.3" name="pro_we_stufentabelle">v1.2 NEU: Pro WE eine Stufentabelle Format A (6 Spalten: Stufe / Monat-Range / Stufenmiete EUR/Mt / Subv./Mt / Dauer / Sigma Phase EUR) plus Sigma-berechnet-Zeile als Self-Check. Quelle: Modul 4 Step 8 Stufen-Output. Header der Stufentabelle: "WE [Nr] [Lage] - IST [X] EUR/Mt -> SOLL [Y] EUR/Mt - Reach [R] J. - Sigma Subv. [S] EUR". Footer: Formel-Hinweis "Stufe_n+1 = Stufe_n * (1+k) (Cap SOLL); Subv./Mt = SOLL minus Stufenmiete; Sigma Phase = Subv./Mt * Dauer".</sektion>
+        <sektion n="8.4">Aggregat-Tabelle + Subventions-Donut (Chart 08a) + Reach-Time-Bar (Chart 08c). Bleibt aus v1.1, nur umnummeriert (war 8.3).</sektion>
         <sektion n="9">Risiko-Heatmap + Risiko-Tabelle</sektion>
         <sektion n="10.1">Verdict-Box + Marge-Sensitivitaet-Linien-Chart + Erklaerung</sektion>
         <sektion n="10.2">Pflicht-Schritte vor Notartermin</sektion>
@@ -246,7 +315,10 @@
       <regel_seitenumbruch>
         Niemals einen Punkt ueber zwei Seiten strecken.
         Wenn moeglich: jeder Unterpunkt eigene Seite.
-        PageBreak vor: Sektion 4, 5.1, 5.3, 6, 7.1, 7.2, 8.2, 8.3, 9, 10.1, 10.2, 11.
+        PageBreak vor: Sektion 4, 5.1, 5.3, 6, 7.1, 7.2, 8.2, 8.3, 8.4, 9, 10.1, 10.2, 11.
+        v1.2: Sektion 8.3 (Pro-WE-Stufentabellen) kann mehrere Seiten umfassen — pro WE
+        eine eigene KeepTogether-Box, automatischer PageBreak wenn naechste Tabelle nicht
+        mehr passt (siehe skill_pdf_export.md R2 + R9).
       </regel_seitenumbruch>
       <stil>
         <regel>Tabellen bevorzugt vor Fliesstext.</regel>
@@ -254,6 +326,8 @@
         <regel>Fliesstext nur fuer Pflichthinweise (BFH/MPB/Disclaimer) und Verdict-Erklaerung.</regel>
         <regel>Spalten-Legende bei Mietspiegel-Tabelle PFLICHT (B/C/D/E/F/G/H/K/O ausgeschrieben).</regel>
         <regel>Excel-Zellen-Bezuege immer mit Sheet-Name und Zelle (z.B. MIETER!M6).</regel>
+        <regel>v1.2: Sektion 10.2 (Pflicht-Schritte vor Notar) — Mietspiegel-Aufgabe nutzt URL aus &lt;mietspiegelrechner_lookup&gt;[OBJEKT_GEMEINDE].mietspiegelrechner. Wenn Stadt nicht im Lookup: Hinweis-Cell mit fallback_logik-Text statt klickbarem Link. Bodenrichtwert + Mietspiegel sind ALWAYS-Pflicht-Zeilen (siehe Step 4 pflicht_items_dauerhaft).</regel>
+        <regel>v1.2: Tabellen-Header BACKGROUND = ORANGE (#f97316) gemaess skill_pdf_export.md v1.1 R4. Gilt fuer ALLE Tabellen im PDF.</regel>
       </stil>
     </step>
 

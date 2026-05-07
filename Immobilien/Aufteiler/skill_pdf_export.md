@@ -3,7 +3,7 @@ name: aufteiler-pdf-export
 description: Pflicht-Skill für jeden Aufteiler-PDF-Export (Modul 5). Spezifiziert verbindliche Layout-Regeln (Spaltenbreiten, KeepTogether, Farbpalette, Word-Wrap, kein Emoji, Hyperlinks) und liefert reportlab-Code-Bausteine, damit PDFs nicht zerschossen aussehen. Nutze diesen Skill JEDES MAL bei Modul 5, ohne Ausnahme.
 type: skill
 language: de
-version: 1.0
+version: 1.1
 ---
 
 # Aufteiler PDF-Export Design-Skill
@@ -38,20 +38,27 @@ Die Summe aller `colWidths` muss exakt der nutzbaren Seitenbreite entsprechen (`
 ### R4 — Farbpalette (aus `modul_5_verdict.xml` `<farb_schema>`)
 
 ```python
-NAVY    = colors.HexColor("#1f2937")  # Header
+NAVY    = colors.HexColor("#1f2937")  # ungenutzt seit v1.1 (frueher Tabellen-Header)
 ACCENT  = colors.HexColor("#0d6efd")  # Akzente, Links
 GREEN   = colors.HexColor("#16a34a")  # GO, OK
 GREEN_BG= colors.HexColor("#d1fae5")
 YELLOW  = colors.HexColor("#eab308")
 YELLOW_BG=colors.HexColor("#fef3c7")
-ORANGE  = colors.HexColor("#f97316")
+ORANGE  = colors.HexColor("#f97316")  # v1.1: Tabellen-Header (vorher NAVY)
 ORANGE_BG=colors.HexColor("#ffedd5")
 RED     = colors.HexColor("#dc2626")
 RED_BG  = colors.HexColor("#fee2e2")
 GRAY    = colors.HexColor("#9ca3af")
 GRAY_BG = colors.HexColor("#f5f7fa")  # Zebra, Key-Cells
-INK     = colors.HexColor("#1a3d6e")  # Headlines
+INK     = colors.HexColor("#1a3d6e")  # Headlines (H1/H2/H3)
 ```
+
+**Anwendungsregel Tabellen-Header (v1.1):**
+- `BACKGROUND = ORANGE` (`#f97316`)
+- `TEXTCOLOR = white`
+- `FONTNAME = Helvetica-Bold`
+
+Gilt für **alle** Tabellen im PDF. INK bleibt für H1/H2/H3-Sektions-Titel im Body. NAVY ist seit v1.1 nicht mehr aktiv im Layout — bleibt nur als Reverenz-Konstante in der Palette.
 
 ### R5 — KEINE Emoji-Glyphs
 
@@ -168,7 +175,7 @@ doc = SimpleDocTemplate(
     pdf_path, pagesize=A4,
     leftMargin=2*cm, rightMargin=2*cm,
     topMargin=1.8*cm, bottomMargin=1.8*cm,
-    title=f"Aufteiler-Verdict {adresse}",
+    title=f"Analyse zur Aufteiler-Kalkulation {adresse}",  # v1.1: vorher "Aufteiler-Verdict"
     author="Aufteiler-Skill",
 )
 TEXT_W = A4[0] - 4*cm  # 17 cm nutzbar
@@ -196,9 +203,10 @@ def make_todo_table(rows):
         ])
     t = Table(body, colWidths=[1.0*cm, 8.5*cm, 4.0*cm, 3.5*cm], repeatRows=1)
     style = TableStyle([
-        # Header
-        ("BACKGROUND", (0,0), (-1,0), NAVY),
+        # Header (v1.1: Tabellen-Header Orange, vorher NAVY)
+        ("BACKGROUND", (0,0), (-1,0), ORANGE),
         ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
         # Body
         ("FONTSIZE", (0,0), (-1,-1), 9),
         ("VALIGN", (0,0), (-1,-1), "TOP"),
@@ -316,7 +324,7 @@ Vor dem Build durchgehen:
 | R1 Word-Wrap | Jeder Tabellen-Cell-Text mit > 30 Zeichen ist Paragraph, nicht String |
 | R2 KeepTogether | Jede Tabelle ist in KeepTogether oder LongTable |
 | R3 Spaltenbreiten | Σ colWidths == 17 cm (oder 16 cm bei Indent) |
-| R4 Farben | NAVY/INK Headers, Status-BG aus Palette |
+| R4 Farben | Tabellen-Header BG = ORANGE (`#f97316`) + textcolor weiss + Helvetica-Bold; INK Sektions-Titel; Status-BG aus Palette |
 | R5 Keine Emojis | grep "🔴|🟢|🟡|✅|⚠️|🔥" im PDF-Skript = leer |
 | R6 Links | Alle URLs als `<link href="...">` Paragraph |
 | R7 Schriften | H1=18, H2=14, H3=11, Body=9.5, Cell=9, Small=8 |
@@ -341,4 +349,5 @@ Nach Build: PDF mit `pdftotext -layout` öffnen oder visuell scrollen. Wenn Text
 
 | Datum | Änderung |
 |-------|----------|
+| 2026-05-07 | v1.1 — Tabellen-Header von NAVY (`#1f2937`) auf ORANGE (`#f97316`) umgestellt; R4-Anwendungsregel ergänzt; Code-Baustein 2.2 aktualisiert (Plan: `plans/2026-05-07-modul5-pdf-export-anpassung.md`) |
 | 2026-04-27 | v1.0 — initiale Skill-Datei aus Layout-Problemen Prosperstr. 59 (Spalten-Overflow, Emoji-Glyphs, mittige Tabellen-Splits) abgeleitet |

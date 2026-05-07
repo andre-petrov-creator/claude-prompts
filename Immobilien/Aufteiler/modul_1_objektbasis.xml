@@ -1,20 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<modul name="Objektbasis" id="1" version="1.0" language="de">
+<modul name="Objektbasis" id="1" version="1.1" language="de">
 
   <!--
     MODUL 1 - OBJEKTBASIS (schlank)
     Zweck: zentrale, einmalige Erfassung der zwei Datenstrukturen,
     die ALLE anderen Module brauchen und die nicht on-demand
     pro Modul erhoben werden koennen:
-    
+
     1. WE-Liste (Wohneinheiten-Tabelle) - Referenzstruktur fuer Modul 5 + Excel
     2. Bodenrichtwert + Gebaeudeanteil - Pflicht-Input fuer Modul 4 (AfA)
-    
+
     Alles andere wandert in die Fachmodule:
     - Heizung-Detail -> Modul 2 energetisch
     - Garagen-Analyse -> Modul 5 oder Excel-Uebertrag
     - Gebaeude-Auf/Abschlaege -> Modul 5 (Wohnwertmerkmale) + Excel
     - Marktpreise vertiefen -> Excel rechnet mit Modul-0-Konsens
+
+    AENDERUNGEN v1.1 vs v1.0 (2026-05-07):
+    - Step B2 umgebaut auf ImmoWertV-Sachwertverfahren (Anlage 4 ImmoWertV 2021).
+      4 Bloecke: Bodenwert, Gebaeudesachwert (vorlaeufig), Marktangepasster Sachwert,
+      Boden-Gebaeude-Verteilung des Kaufpreises.
+    - Neue Pflicht-Inputs: BGF (Brutto-Grundflaeche), NHK_2010 (Normalherstellungskosten
+      je m^2 BGF), BKI-Index 2026 fuer Indexierung, Sachwertfaktor (aus GMB Stadt-Subpage).
+    - Vereinfachte Methode (KP minus Bodenwert) bleibt als Fallback wenn BGF/NHK fehlen,
+      mit deutlichem User-Hinweis dass FA-Akzeptanz dann nicht garantiert ist.
+    - Excel-Transfer-Block um neue Felder erweitert (Vorschlag fuer Template-Erweiterung).
+    Plan-Ref: plans/2026-05-07-modul5-pdf-export-anpassung.md
   -->
 
   <identity>
@@ -63,6 +74,12 @@
       <input>Grundstuecksflaeche (m2)</input>
       <input>Kaufpreis (EUR)</input>
     </required>
+    <required_fuer_sachwertverfahren since="v1.1">
+      <input>BGF (Brutto-Grundflaeche, m2) — meist Wohnflaeche * 1,30..1,40 oder Architektenwert</input>
+      <input>NHK_2010 (Normalherstellungskosten je m2 BGF in EUR; Anlage 4 ImmoWertV 2021; abhaengig von Gebaeudetyp + Standardstufe; MFH Bj. 1977 Standard normal: ca. 700-900 EUR/m^2)</input>
+      <input>BKI-Index 2026 (Baupreisindex zur Indexierung NHK_2010 von 2010 auf 2026; aktueller Wert: User-Recherche oder Notion-Preisdatenbank)</input>
+      <input>Sachwertfaktor (aus GMB Stadt-Subpage; Default 1,0 wenn nicht ermittelbar)</input>
+    </required_fuer_sachwertverfahren>
     <optional>
       <input>Mietbeginn-Daten je WE (fuer Altmieter-Erkennung)</input>
       <input>Wohnflaeche je WE</input>
@@ -135,29 +152,96 @@
       </output_field>
     </step>
 
-    <step n="B2" name="grundstueckswert_und_gebaeudeanteil">
-      <task>Aus Bodenrichtwert + Grundstueck + Kaufpreis die AfA-Basis fuer Modul 4 ableiten.</task>
-      <formel>
-        Grundstueckswert = Bodenrichtwert × Grundstuecksflaeche
-        Gebaeudewert = Kaufpreis - Grundstueckswert
-        Gebaeudeanteil = Gebaeudewert / Kaufpreis (in %)
-      </formel>
+    <step n="B2" name="gebaeudewert_sachwertverfahren" version_since="v1.1">
+      <task>
+        Boden-Gebaeude-Verteilung des Kaufpreises nach ImmoWertV-Sachwertverfahren
+        (Anlage 4 ImmoWertV 2021). Liefert FA-anerkannte AfA-Bemessungsgrundlage und ist
+        konsistent mit RND-Modell aus Modul 3 (gleiche ImmoWertV-Datenquelle).
+      </task>
+      <vorgehen>
+        <a>Pruefen ob BGF, NHK_2010, BKI-Index, Sachwertfaktor vorhanden.
+           Wenn JA: Sachwertverfahren (4 Bloecke unten).
+           Wenn NEIN: Fallback vereinfachte Methode (Block 1 + 4 mit KP minus Bodenwert),
+           mit klarem User-Hinweis "FA-Akzeptanz nicht garantiert ohne Sachwertverfahren —
+           BGF/NHK_2010/Sachwertfaktor in Modul 1 ergaenzen".</a>
+      </vorgehen>
+
+      <block_1 name="bodenwert">
+        <formel>Bodenwert_EUR = Bodenrichtwert_EUR_pro_m2 * Grundstuecksflaeche_m2</formel>
+        <output>Bodenwert in EUR (Grundstueckswert).</output>
+      </block_1>
+
+      <block_2 name="gebaeudesachwert_vorlaeufig">
+        <formel>
+          NHK_2010_indexiert = NHK_2010 * (BKI_Index_2026 / BKI_Index_2010)
+          Alterswertminderung_Faktor = (Gebaeudealter_Jahre / GND_Jahre) * (1 - Modernisierungspunkte / 20)
+          Modernisierungsfaktor = 1 + (Modernisierungspunkte / 20) * 0,1   [vereinfacht: 0..10 % Bonus]
+          Gebaeudesachwert_vorlaeufig = NHK_2010_indexiert * BGF * (1 - Alterswertminderung_Faktor) * Modernisierungsfaktor
+        </formel>
+        <inputs>
+          BGF aus Inputs (v1.1).
+          NHK_2010 aus Inputs (v1.1).
+          BKI_Index_2026, BKI_Index_2010 aus Inputs (v1.1).
+          GND, Modernisierungspunkte aus Modul 3 (RND-Modell). Wenn Modul 3 noch nicht gelaufen:
+          Default-Annahme GND=80, Modernisierungspunkte=Schaetzung User; spaeter durch Modul-3-Werte ersetzen.
+          Gebaeudealter aus B1 (Aufbau-Baujahr).
+        </inputs>
+        <output>Vorlaeufiger Gebaeudesachwert in EUR.</output>
+      </block_2>
+
+      <block_3 name="marktangepasster_sachwert">
+        <formel>
+          Vorlaeufiger_Sachwert = Bodenwert + Gebaeudesachwert_vorlaeufig
+          Marktangepasster_Sachwert = Vorlaeufiger_Sachwert * Sachwertfaktor
+        </formel>
+        <regel>Sachwertfaktor aus GMB Stadt-Subpage (Notion). Wenn nicht verfuegbar: Default 1,0 + Hinweis im Output.</regel>
+        <output>Marktangepasster Sachwert in EUR (= Verkehrswert nach Sachwertverfahren).</output>
+      </block_3>
+
+      <block_4 name="kaufpreis_verteilung">
+        <formel>
+          Gebaeude_KP_Anteil_EUR = Kaufpreis * Gebaeudesachwert_vorlaeufig / Vorlaeufiger_Sachwert
+          Boden_KP_Anteil_EUR = Kaufpreis - Gebaeude_KP_Anteil_EUR
+          Gebaeudeanteil_Prozent = Gebaeude_KP_Anteil_EUR / Kaufpreis * 100
+        </formel>
+        <regel>
+          Verteilungsverhaeltnis aus dem Sachwertverfahren wird auf den TATSAECHLICHEN Kaufpreis angewendet.
+          Das ist die FA-konforme Methodik: das Sachwertverhaeltnis verteilt den KP, nicht eine
+          Subtraktion vom KP. So bleibt der KP gewahrt, die Verteilung folgt aber der Sachwert-Logik.
+        </regel>
+        <output>Gebaeude-KP-Anteil = AfA-Bemessungsgrundlage (geht in Modul 3 / KALKU).</output>
+      </block_4>
+
       <plausibilisierung>
-        Gebaeudeanteil sollte zwischen 50% und 90% liegen.
-        Unter 50%: Grundstueck dominiert, AfA-Hebel klein, Hinweis ausgeben.
-        Ueber 90%: Bodenrichtwert wahrscheinlich zu niedrig oder Sondersituation, Hinweis.
+        Gebaeudeanteil sollte zwischen 50 % und 90 % liegen.
+        Unter 50 %: Grundstueck dominiert, AfA-Hebel klein, Hinweis ausgeben.
+        Ueber 90 %: Bodenrichtwert wahrscheinlich zu niedrig oder Sondersituation, Hinweis.
+        Bei Fallback (vereinfachte Methode): Plausi greift gleich; Verteilung weniger robust gegen FA-Pruefung.
       </plausibilisierung>
+
       <output_table>
         | Position | Wert |
         | Bodenrichtwert EUR/m2 | aus B1 |
         | Grundstuecksflaeche m2 | aus Expose |
-        | **Grundstueckswert EUR** | berechnet |
+        | **Bodenwert EUR (Block 1)** | berechnet |
+        | BGF m2 | Input v1.1 |
+        | NHK_2010 EUR/m2 | Input v1.1 |
+        | NHK_2010 indexiert EUR/m2 | berechnet (Block 2) |
+        | Modernisierungspunkte | aus Modul 3 |
+        | GND / GA Jahre | aus Modul 3 |
+        | Alterswertminderung % | berechnet (Block 2) |
+        | **Gebaeudesachwert vorlaeufig EUR (Block 2)** | berechnet |
+        | Sachwertfaktor | Input v1.1 |
+        | **Marktangepasster Sachwert EUR (Block 3)** | berechnet |
         | Kaufpreis EUR | aus Expose |
-        | **Gebaeudewert EUR** | berechnet |
+        | **Gebaeude-KP-Anteil EUR (Block 4)** | berechnet — AfA-Bemessungsgrundlage |
+        | **Boden-KP-Anteil EUR (Block 4)** | berechnet |
         | **Gebaeudeanteil %** | berechnet |
         | Plausibilitaets-Check | ok / warnung |
+        | Methodik | Sachwertverfahren / Fallback (vereinfacht) |
       </output_table>
-      <regel>Diese Werte sind Pflicht-Input fuer Modul 4 AfA. Ohne sie keine saubere Restnutzungsdauer-Berechnung.</regel>
+
+      <regel>Gebaeude-KP-Anteil ist Pflicht-Input fuer Modul 3 AfA. Ohne saubere Verteilung keine BFH-IX-R-7/23-tragfaehige AfA-Argumentation.</regel>
     </step>
 
     <!-- ========================================================== -->
@@ -206,13 +290,27 @@
       | BESICHTIGUNG  | B31           | Anzahl vermietet              | Step A1 Summe  |
       | BESICHTIGUNG  | B32           | Anzahl Leerstand              | Step A1 Summe  |
       | KALKU         | C20           | Bodenrichtwert EUR/m2         | Step B1        |
-      | KALKU         | C21           | Grundstueckswert EUR          | Step B2        |
-      | KALKU         | C22           | Gebaeudewert EUR              | Step B2        |
-      | KALKU         | C23           | Gebaeudeanteil %              | Step B2        |
+      | KALKU         | C21           | Bodenwert EUR (Block 1)       | Step B2 Block 1 |
+      | KALKU         | C22           | Gebaeude-KP-Anteil EUR (= AfA-Basis) | Step B2 Block 4 |
+      | KALKU         | C23           | Gebaeudeanteil %              | Step B2 Block 4 |
     </ziel_zellen>
+    <ziel_zellen_v1_1_vorschlag since="v1.1">
+      <hinweis>
+        Vorschlag fuer Excel-Template-Erweiterung — bei naechstem Template-Bump anlegen.
+        Bis dahin werden diese Werte nur im Chat-Output und im PDF (Sektion 3) gefuehrt.
+      </hinweis>
+      | Sheet | Zelle | Bedeutung | Quelle Modul 1 |
+      | KALKU | C24 | BGF m2 | Step B2 Input |
+      | KALKU | C25 | NHK_2010 indexiert EUR/m2 | Step B2 Block 2 |
+      | KALKU | C26 | Gebaeudesachwert vorlaeufig EUR | Step B2 Block 2 |
+      | KALKU | C27 | Sachwertfaktor | Step B2 Input |
+      | KALKU | C28 | Marktangepasster Sachwert EUR | Step B2 Block 3 |
+    </ziel_zellen_v1_1_vorschlag>
     <hinweis>
       Zelladressen fuer Boden/Gebaeude in der Excel-Vorlage final pruefen.
       Falls in Vorlage nicht vorhanden: in Excel-Erweiterung erstellen.
+      v1.1: Sachwertverfahren-Werte (C24-C28) sind Vorschlag, kein verbindlicher Schreib-Zwang.
+      Modul 5 zieht die Werte direkt aus Modul-1-Chat-Output, nicht zwingend aus Excel.
     </hinweis>
   </excel_transfer_block>
 

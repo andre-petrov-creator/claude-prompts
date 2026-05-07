@@ -24,12 +24,12 @@ Status-Legende: ✓ = dokumentiert · ○ = Skeleton · — = noch nicht angeleg
 |------------|-------|--------|
 | Orchestrator | `orchestrator.md` | — |
 | Modul 0 — Quick-Check | `modul_0_quickcheck.md` | — |
-| Modul 1 — Objektbasis | `modul_1_objektbasis.md` | — |
+| Modul 1 — Objektbasis | [`modul_1_objektbasis.md`](modul_1_objektbasis.md) | ✓ |
 | Modul 2 — Maßnahmen | `modul_2_massnahmen.md` | — |
 | Modul 3 — RND + AfA | `modul_3_rnd_afa.md` | — |
 | Modul 4 — Mietsituation | `modul_4_miete.md` | — |
-| Modul 5 — Verdict-Export | `modul_5_verdict.md` | — |
-| Skill PDF-Export | `skill_pdf_export.md` | — |
+| Modul 5 — Verdict-Export | [`modul_5_verdict.md`](modul_5_verdict.md) | ✓ |
+| Skill PDF-Export | [`skill_pdf_export.md`](skill_pdf_export.md) | ✓ |
 | Excel-Template (Sheets, Zellen, Formeln) | `excel_handoff.md` | — |
 | Notion-Datenquellen | `notion_quellen.md` | — |
 
