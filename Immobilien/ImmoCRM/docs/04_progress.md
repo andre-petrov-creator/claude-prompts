@@ -13,12 +13,13 @@ Status pro Bauschritt aus [02_implementierungsplan.md](02_implementierungsplan.m
 | ✅ | Ordner-Struktur (`docs/`, `src/`, CLAUDE.md, GUIDELINES.md, ADRs, Progress, .gitignore) | 2026-05-08 |
 | ✅ | Vite + React + TS initialisieren (strict mode) | 2026-05-08 — Vite 5.4, React 18.3, TS 5.6 |
 | ✅ | Tailwind + shadcn/ui Setup (Theme default, Base color zinc) | 2026-05-08 — Button-Component installiert |
-| ⬜ | Supabase-Projekt anlegen (Free Tier) | manuell durch User |
+| ✅ | Supabase-Projekt anlegen (Free Tier) | 2026-05-08 — `immo-crm` in Frankfurt (eu-central-1) |
 | ✅ | Supabase Client (`@supabase/supabase-js`) + Singleton (`src/lib/supabase.ts`) | 2026-05-08 |
-| ✅ | `.env.example` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) | 2026-05-08 — `.env` durch User füllen |
+| ✅ | `.env.example` + lokale `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) | 2026-05-08 |
 | ✅ | Smoke-Build (`npm run build`) grün | 2026-05-08 — 36 Module, 2,98 s |
-| ⬜ | Git-Repo initialisieren (Sub-Repo unter `meine-projekte`) | Mono-Repo `meine-projekte` ist bereits initialisiert; nur Commit nötig |
-| ⬜ | Erstes Vercel-Deployment (Hello World) | manuell durch User (siehe Checkliste am Ende dieses Schritts) |
+| ✅ | Smoke-Test lokal (`npm run dev`) — Button + Alert + keine Console-Errors | 2026-05-08 |
+| ✅ | Git-Repo (Mono-Repo `meine-projekte`) — Schritt-0-Commit gepusht | 2026-05-08 — `6d79606` |
+| ✅ | Vercel-Deployment Hello World | 2026-05-08 — https://immo-crm-xi.vercel.app (HTTP 200) |
 
 ---
 
