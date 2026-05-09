@@ -27,7 +27,7 @@ Status pro Bauschritt aus [02_implementierungsplan.md](02_implementierungsplan.m
 
 | # | Schritt | Status | Datum | ADRs | Bemerkung |
 |---|---------|--------|-------|------|-----------|
-| 1 | Datenbank-Schema | ⬜ | — | — | Migrations + Test-Daten |
+| 1 | Datenbank-Schema | ✅ | 2026-05-09 | 003-008 | Migration applied via MCP, RLS+GRANTs verifiziert, Types generiert |
 | 2 | Lead-Liste UI (read-only) | ⬜ | — | — | TanStack Table, Sektionen, Filter |
 | 3 | Lead-Liste Interaktionen | ⬜ | — | — | Quick-Info, Notiz-Panel, Anruf-Hover |
 | 4 | Manueller Lead | ⬜ | — | — | Schnell-Tab, Duplikat-Check |
