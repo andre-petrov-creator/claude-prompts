@@ -108,7 +108,9 @@ CREATE TABLE activity_log (
 
 -- updated_at-Trigger: setzt updated_at auf now() bei jedem UPDATE
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql
+SET search_path = public, pg_catalog
+AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
@@ -133,7 +135,9 @@ CREATE TRIGGER trg_deal_notes_updated_at
 
 -- Werktag-Logik (ADR-005): überspringt Sa/So + NRW-Feiertage
 CREATE OR REPLACE FUNCTION next_business_day(d date)
-RETURNS date LANGUAGE sql STABLE AS $$
+RETURNS date LANGUAGE sql STABLE
+SET search_path = public, pg_catalog
+AS $$
   WITH RECURSIVE next_day AS (
     SELECT d AS candidate
     UNION ALL
@@ -149,7 +153,9 @@ $$;
 
 -- Followup-Berechnung (ADR-005): offen +5 Werktage, berechnet +14, absage NULL
 CREATE OR REPLACE FUNCTION compute_followup(angebot date, status text, last_activity date)
-RETURNS date LANGUAGE sql STABLE AS $$
+RETURNS date LANGUAGE sql STABLE
+SET search_path = public, pg_catalog
+AS $$
   SELECT CASE status
     WHEN 'offen'     THEN next_business_day(GREATEST(angebot, COALESCE(last_activity, angebot)) + 5)
     WHEN 'berechnet' THEN next_business_day(GREATEST(angebot, COALESCE(last_activity, angebot)) + 14)
@@ -157,8 +163,12 @@ RETURNS date LANGUAGE sql STABLE AS $$
   END;
 $$;
 
-CREATE INDEX idx_contact_comments_contact_created
-  ON contact_comments(contact_id, created_at DESC);
+-- FK-Indices: ohne diese sind JOINs langsam (Supabase-Linter-Empfehlung)
+CREATE INDEX idx_contact_comments_contact_created ON contact_comments(contact_id, created_at DESC);
+CREATE INDEX idx_deals_contact_id           ON deals(contact_id);
+CREATE INDEX idx_deal_notes_deal_id         ON deal_notes(deal_id);
+CREATE INDEX idx_activity_log_contact_id    ON activity_log(contact_id);
+CREATE INDEX idx_activity_log_deal_id       ON activity_log(deal_id);
 
 -- View für Frontend/Cron-Mail (ADR-005 + ADR-008): security_invoker = RLS des Aufrufers gilt
 CREATE VIEW deals_with_followup
