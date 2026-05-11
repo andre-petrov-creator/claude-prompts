@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { flexRender, type Table, type Row } from "@tanstack/react-table"
 import {
   Collapsible,
@@ -31,11 +31,24 @@ export default function LeadSections({
     if (s && s in rowsByStatus) rowsByStatus[s].push(row)
   }
 
-  const [open, setOpen] = useState<Record<DealStatus, boolean>>({
-    berechnet: true,
-    offen: true,
-    absage: false,
+  const SECTION_OPEN_KEY = "immo-crm.leadTable.sectionOpen"
+  const [open, setOpen] = useState<Record<DealStatus, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem(SECTION_OPEN_KEY)
+      if (raw) return JSON.parse(raw) as Record<DealStatus, boolean>
+    } catch {
+      // ignore
+    }
+    return { berechnet: true, offen: true, absage: false }
   })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SECTION_OPEN_KEY, JSON.stringify(open))
+    } catch {
+      // ignore
+    }
+  }, [open])
 
   const total = table.getRowModel().rows.length
 

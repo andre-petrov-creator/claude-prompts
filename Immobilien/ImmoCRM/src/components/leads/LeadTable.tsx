@@ -56,40 +56,57 @@ const LEAD_SOURCE_DEFAULTS = [
   "Auktion",
 ]
 
-const COLUMN_SIZING_STORAGE_KEY = "immo-crm.leadTable.columnSizing"
+const STORAGE_KEYS = {
+  columnSizing: "immo-crm.leadTable.columnSizing",
+  columnVisibility: "immo-crm.leadTable.columnVisibility",
+  sorting: "immo-crm.leadTable.sorting",
+} as const
 
 const dedupSorted = (a: string[], b: string[]) =>
   Array.from(new Set([...a, ...b])).sort((x, y) => x.localeCompare(y))
 
-const loadColumnSizing = (): ColumnSizingState => {
+const loadJson = <T,>(key: string, fallback: T): T => {
   try {
-    const raw = localStorage.getItem(COLUMN_SIZING_STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as ColumnSizingState) : {}
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : fallback
   } catch {
-    return {}
+    return fallback
+  }
+}
+
+const saveJson = (key: string, value: unknown) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // localStorage full or disabled — silently ignore
   }
 }
 
 export default function LeadTable({ data }: { data: LeadRow[] }) {
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+  const [sorting, setSorting] = useState<SortingState>(() =>
+    loadJson(STORAGE_KEYS.sorting, [] as SortingState),
+  )
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
+    () => loadJson(STORAGE_KEYS.columnVisibility, {} as VisibilityState),
+  )
   const [globalFilter, setGlobalFilter] = useState("")
-  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(
-    () => loadColumnSizing(),
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() =>
+    loadJson(STORAGE_KEYS.columnSizing, {} as ColumnSizingState),
   )
   const [panelDealId, setPanelDealId] = useState<string | null>(null)
   const [panelDealLabel, setPanelDealLabel] = useState("")
 
   useEffect(() => {
-    try {
-      localStorage.setItem(
-        COLUMN_SIZING_STORAGE_KEY,
-        JSON.stringify(columnSizing),
-      )
-    } catch {
-      // localStorage full or disabled — silently ignore
-    }
+    saveJson(STORAGE_KEYS.columnSizing, columnSizing)
   }, [columnSizing])
+
+  useEffect(() => {
+    saveJson(STORAGE_KEYS.columnVisibility, columnVisibility)
+  }, [columnVisibility])
+
+  useEffect(() => {
+    saveJson(STORAGE_KEYS.sorting, sorting)
+  }, [sorting])
 
   const updateDeal = useUpdateDealField()
   const updateContact = useUpdateContactField()
