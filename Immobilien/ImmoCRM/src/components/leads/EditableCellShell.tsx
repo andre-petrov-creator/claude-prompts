@@ -44,7 +44,7 @@ export default function EditableCellShell({
     setPencilVisible(false)
   }
 
-  const activate = (e: React.MouseEvent) => {
+  const handlePencilClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     onActivate()
   }
@@ -53,15 +53,22 @@ export default function EditableCellShell({
     <div
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
-      onClick={activate}
-      className={`group flex items-center gap-1.5 cursor-pointer min-h-[1.5rem] ${className ?? ""}`}
+      className={`flex items-center gap-1.5 min-h-[1.5rem] ${className ?? ""}`}
     >
       <span className="flex-1 truncate">{display}</span>
-      <Pencil
-        className={`w-3.5 h-3.5 text-zinc-400 transition-opacity flex-shrink-0 ${
-          pencilVisible ? "opacity-100" : "opacity-0"
+      <button
+        type="button"
+        onClick={handlePencilClick}
+        aria-label="Bearbeiten"
+        title="Bearbeiten"
+        className={`flex-shrink-0 p-0.5 rounded hover:bg-zinc-200 transition-opacity ${
+          pencilVisible
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
         }`}
-      />
+      >
+        <Pencil className="w-3.5 h-3.5 text-zinc-500" />
+      </button>
     </div>
   )
 }
