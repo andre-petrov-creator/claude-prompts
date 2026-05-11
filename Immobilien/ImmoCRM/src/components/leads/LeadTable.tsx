@@ -14,6 +14,7 @@ import LeadSections from "./LeadSections"
 import ContactQuickInfo from "./ContactQuickInfo"
 import ExposeLink from "./ExposeLink"
 import AnrufCell from "./AnrufCell"
+import BesichtigungCell from "./BesichtigungCell"
 import DealNotesPanel from "./DealNotesPanel"
 import {
   formatCurrency,
@@ -22,6 +23,19 @@ import {
   isOverdue,
 } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
+
+const dash = (v: unknown) => (v == null || v === "" ? "" : String(v))
+
+const formatAddress = (
+  street: string | null | undefined,
+  zip: string | null | undefined,
+  city: string | null | undefined,
+): string => {
+  const top = (street ?? "").trim()
+  const bottomParts = [zip, city].filter(Boolean).join(" ").trim()
+  if (top && bottomParts) return `${top}, ${bottomParts}`
+  return top || bottomParts
+}
 
 export default function LeadTable({ data }: { data: LeadRow[] }) {
   const [sorting, setSorting] = useState<SortingState>([])
@@ -32,7 +46,9 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
 
   const openPanel = (row: LeadRow) => {
     setPanelDealId(row.id!)
-    setPanelDealLabel(`${row.address ?? "—"} · ${row.contact.name}`)
+    setPanelDealLabel(
+      `${formatAddress(row.address, row.zip, row.city) || "—"} · ${row.contact.name}`,
+    )
   }
 
   const columns = useMemo<ColumnDef<LeadRow>[]>(
@@ -41,6 +57,7 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         id: "status",
         header: "Status",
         accessorKey: "status",
+        size: 100,
         cell: ({ row }) => (
           <StatusBadge status={row.original.status as DealStatus} />
         ),
@@ -49,6 +66,7 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         id: "name",
         header: "Name",
         accessorFn: (r) => r.contact.name,
+        size: 160,
         cell: ({ row }) => (
           <ContactQuickInfo
             name={row.original.contact.name}
@@ -62,22 +80,29 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
       {
         id: "company",
         header: "Firma",
-        accessorFn: (r) => r.contact.company ?? "—",
+        accessorFn: (r) => r.contact.company ?? "",
+        size: 140,
+        cell: ({ getValue }) => dash(getValue()),
       },
       {
         id: "phone",
         header: "Telefon",
-        accessorFn: (r) => r.contact.phone ?? "—",
+        accessorFn: (r) => r.contact.phone ?? "",
+        size: 130,
+        cell: ({ getValue }) => dash(getValue()),
       },
       {
         id: "email",
         header: "E-Mail",
-        accessorFn: (r) => r.contact.email ?? "—",
+        accessorFn: (r) => r.contact.email ?? "",
+        size: 200,
+        cell: ({ getValue }) => dash(getValue()),
       },
       {
         id: "letzter_anruf",
         header: "Anruf",
         accessorKey: "letzter_anruf",
+        size: 130,
         cell: ({ row }) => (
           <AnrufCell
             dealId={row.original.id!}
@@ -89,78 +114,128 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         id: "besichtigung_datum",
         header: "Besichtigung",
         accessorKey: "besichtigung_datum",
-        cell: ({ getValue }) => formatDate(getValue() as string),
+        size: 130,
+        cell: ({ row }) => (
+          <BesichtigungCell
+            dealId={row.original.id!}
+            value={row.original.besichtigung_datum}
+          />
+        ),
       },
       {
         id: "lead_source",
         header: "Lead-Herkunft",
-        accessorFn: (r) => r.contact.lead_source ?? "—",
+        accessorFn: (r) => r.contact.lead_source ?? "",
+        size: 130,
+        cell: ({ getValue }) => dash(getValue()),
       },
       {
-        id: "address",
-        header: "Objekt",
-        accessorKey: "address",
-        cell: ({ getValue }) => (getValue() as string) ?? "—",
-      },
-      {
-        id: "zip_city",
+        id: "address_full",
         header: "Adresse",
-        accessorFn: (r) => `${r.zip ?? ""} ${r.city ?? ""}`.trim() || "—",
+        accessorFn: (r) => formatAddress(r.address, r.zip, r.city),
+        size: 220,
+        cell: ({ row }) => {
+          const top = (row.original.address ?? "").trim()
+          const bottomParts = [row.original.zip, row.original.city]
+            .filter(Boolean)
+            .join(" ")
+            .trim()
+          if (!top && !bottomParts) return ""
+          return (
+            <div className="leading-tight">
+              {top && <div>{top}</div>}
+              {bottomParts && (
+                <div className="text-xs text-zinc-500">{bottomParts}</div>
+              )}
+            </div>
+          )
+        },
       },
       {
         id: "object_type",
         header: "Verwendung",
         accessorKey: "object_type",
-        cell: ({ getValue }) => (getValue() as string) ?? "—",
+        size: 110,
+        cell: ({ getValue }) => dash(getValue()),
       },
       {
         id: "wohnflaeche_m2",
         header: "Wohnfläche",
         accessorKey: "wohnflaeche_m2",
-        cell: ({ getValue }) => formatM2(getValue() as number),
+        size: 110,
+        cell: ({ getValue }) => {
+          const v = getValue()
+          return v == null || v === "" ? "" : formatM2(v as number)
+        },
       },
       {
         id: "preis_kauf",
         header: "Preis",
         accessorKey: "preis_kauf",
-        cell: ({ getValue }) => formatCurrency(getValue() as number),
+        size: 110,
+        cell: ({ getValue }) => {
+          const v = getValue()
+          return v == null || v === "" ? "" : formatCurrency(v as number)
+        },
       },
       {
         id: "preis_pro_m2",
         header: "€/m²",
         accessorKey: "preis_pro_m2",
-        cell: ({ getValue }) => formatCurrency(getValue() as number),
+        size: 90,
+        cell: ({ getValue }) => {
+          const v = getValue()
+          return v == null || v === "" ? "" : formatCurrency(v as number)
+        },
       },
       {
         id: "kalk_verkaufspreis",
         header: "Kalk Verkauf",
         accessorKey: "kalk_verkaufspreis",
-        cell: ({ getValue }) => formatCurrency(getValue() as number),
+        size: 120,
+        cell: ({ getValue }) => {
+          const v = getValue()
+          return v == null || v === "" ? "" : formatCurrency(v as number)
+        },
       },
       {
         id: "kalk_pro_m2",
         header: "Kalk €/m²",
         accessorKey: "kalk_pro_m2",
-        cell: ({ getValue }) => formatCurrency(getValue() as number),
+        size: 100,
+        cell: ({ getValue }) => {
+          const v = getValue()
+          return v == null || v === "" ? "" : formatCurrency(v as number)
+        },
       },
       {
         id: "mein_angebot",
         header: "Mein Angebot",
         accessorKey: "mein_angebot",
-        cell: ({ getValue }) => formatCurrency(getValue() as number),
+        size: 120,
+        cell: ({ getValue }) => {
+          const v = getValue()
+          return v == null || v === "" ? "" : formatCurrency(v as number)
+        },
       },
       {
         id: "angebot_datum",
         header: "Angebot gültig",
         accessorKey: "angebot_datum",
-        cell: ({ getValue }) => formatDate(getValue() as string),
+        size: 120,
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null
+          return v ? formatDate(v) : ""
+        },
       },
       {
         id: "naechste_nachfass",
         header: "Nächste Nachfass",
         accessorKey: "naechste_nachfass",
+        size: 130,
         cell: ({ getValue }) => {
           const v = getValue() as string | null
+          if (!v) return ""
           return (
             <span
               className={cn(isOverdue(v) && "text-red-600 font-semibold")}
@@ -173,6 +248,7 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
       {
         id: "expose",
         header: "Exposé",
+        size: 80,
         cell: ({ row }) => (
           <ExposeLink
             url={row.original.expose_url}
@@ -184,6 +260,7 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         id: "notes",
         header: "Notizen",
         accessorKey: "notes_count",
+        size: 100,
         cell: ({ row, getValue }) => {
           const n = getValue() as number
           return (

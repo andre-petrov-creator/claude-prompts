@@ -69,14 +69,22 @@ export default function LeadSections({
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="overflow-x-auto rounded border">
-              <table className="w-full text-sm">
+              <table
+                className="text-sm"
+                style={{ tableLayout: "fixed", width: "max-content" }}
+              >
+                <colgroup>
+                  {table.getVisibleLeafColumns().map((col) => (
+                    <col key={col.id} style={{ width: `${col.getSize()}px` }} />
+                  ))}
+                </colgroup>
                 <thead className="bg-zinc-50">
                   {table.getHeaderGroups().map((hg) => (
                     <tr key={hg.id}>
                       {hg.headers.map((h) => (
                         <th
                           key={h.id}
-                          className="px-3 py-2 text-left font-medium border-b cursor-pointer hover:bg-zinc-100 whitespace-nowrap"
+                          className="px-3 py-2 text-left font-medium border-b cursor-pointer hover:bg-zinc-100 whitespace-nowrap overflow-hidden text-ellipsis"
                           onClick={h.column.getToggleSortingHandler()}
                         >
                           {flexRender(
@@ -107,14 +115,14 @@ export default function LeadSections({
                         {row.getVisibleCells().map((cell) => (
                           <td
                             key={cell.id}
-                            className="px-3 py-2 whitespace-nowrap"
+                            className="px-3 py-2 truncate"
                           >
                             {cell.column.columnDef.cell
                               ? flexRender(
                                   cell.column.columnDef.cell,
                                   cell.getContext(),
                                 )
-                              : String(cell.getValue() ?? "—")}
+                              : String(cell.getValue() ?? "")}
                           </td>
                         ))}
                       </tr>
