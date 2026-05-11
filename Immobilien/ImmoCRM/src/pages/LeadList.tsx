@@ -4,7 +4,14 @@ import LeadTable from "@/components/leads/LeadTable"
 export default function LeadList() {
   const { data, isLoading, error } = useDeals()
   if (isLoading) return <div className="text-zinc-500">Lädt…</div>
-  if (error)
-    return <div className="text-red-600">Fehler: {String(error)}</div>
+  if (error) {
+    const msg =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error && "message" in error
+          ? String((error as { message: unknown }).message)
+          : JSON.stringify(error)
+    return <div className="text-red-600">Fehler: {msg}</div>
+  }
   return <LeadTable data={data ?? []} />
 }
