@@ -47,7 +47,7 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
       },
       {
         id: "name",
-        header: "Makler",
+        header: "Name",
         accessorFn: (r) => r.contact.name,
         cell: ({ row }) => (
           <ContactQuickInfo
@@ -182,7 +182,7 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
       },
       {
         id: "notes",
-        header: "Notiz",
+        header: "Notizen",
         accessorKey: "notes_count",
         cell: ({ row, getValue }) => {
           const n = getValue() as number
@@ -221,7 +221,6 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         table={table}
         globalFilter={globalFilter}
         setGlobalFilter={setGlobalFilter}
-        onRowClick={openPanel}
       />
       <DealNotesPanel
         dealId={panelDealId}
