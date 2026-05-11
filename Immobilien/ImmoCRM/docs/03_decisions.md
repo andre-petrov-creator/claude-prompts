@@ -557,3 +557,39 @@ Schritt 3 ist der erste Bauschritt mit Schreib-Operationen aus dem Frontend (Not
 - Wenn Tiptap-Bundle in Schritt 10 (Polish) als Performance-Problem auffällt: Lazy-Load via `React.lazy()` auf das Sheet-Panel beschränken
 - shadcn-Calendar-Variante minimal selbst geschrieben (react-day-picker v9 statt v10) — falls Calendar weitere Features braucht (Range-Picker, Time-Picker), prüfen ob shadcn-CLI-Output zu v9 passt
 
+---
+
+## ADR-012 — Lead-Anlegen-UI: Combobox-Pattern, non-destruktiver Hard-Match, Deal-Duplikat-Check
+
+- **Datum:** 2026-05-11
+- **Status:** Accepted
+- **Schritt:** 4 (Manueller Lead)
+
+### Kontext
+Schritt 4 baut die manuelle Lead-Anlage als Modal mit Tabs. Mehrere Sub-Entscheidungen fallen zusammen, statt einzelner Mini-ADRs.
+
+### Entscheidung
+
+1. **Combobox** für Kontakt-Suche: Wiederverwendung des bestehenden Popover-basierten Patterns aus `EditableComboboxCell`. Kein `cmdk`-Package — Konsistenz und kein zusätzlicher Bundle-Overhead.
+2. **Hard-Match (Email exact)**: non-destruktiver Merge — name + email werden NIE überschrieben, nur leere DB-Felder (phone, company, position, lead_source) werden mit Form-Werten gefüllt. Toast macht den Pfad transparent ("ergänzt" / "verwendet").
+3. **Soft-Match (Name + keine Email)**: AlertDialog mit 3-Wege-Choice (Merge mit Kandidat / Neu anlegen / Abbrechen). Triggert nur, wenn Form-Email leer ist — sonst ist der Pfad eindeutig (Hard-Match oder No-Match).
+4. **Deal-Duplikat-Check (NEU vs. Spec)**: Spec sagte nur "Duplikat-Check Email + Name", aber derselbe Makler kann mehrere Objekte haben — reiner Contact-Match deckt das nicht ab. Daher zusätzlicher Check auf normalize(address) + zip pro Contact, mit ±1m²-Toleranz wenn beide wohnflaeche_m2 gesetzt. Bei Match: AlertDialog "Trotzdem anlegen / Abbrechen".
+5. **AlertDialog-Implementierung**: minimaler Wrapper auf `@radix-ui/react-dialog` (schon installiert für Sheet) — kein neues Radix-Package. Eigener Wrapper, weil 3-Wege-Choice nicht mit `window.confirm` funktioniert.
+6. **Frontend-Transaktion ohne Rollback**: useCreateLead macht 3 sequentielle Calls (contact-resolve/insert → deal-insert → activity_log-insert). Bei Fehler nach erfolgreichem Contact-Insert bleibt der Contact bestehen (= "Contact-Leak"). Akzeptiert für Single-User — User kann erneut versuchen, der Contact wird beim 2. Versuch via Hard/Soft-Match wiederverwendet. RPC würde Schritt-7-Aufwand (Service-Role-Aufteiler) duplizieren.
+7. **Position-Default "Makler"** nur bei NEUEM Contact, nicht bei Hard-Match-Update.
+
+### Begründung
+- Combobox-Pattern: 0 neue Abhängigkeiten, identische UX zu InlineEdit-Cells
+- Non-destruktiv: schützt vor Tipp-Müll-Override (User-Anforderung "Mischmasch vermeiden")
+- Deal-Dup-Check: User-Anforderung — verhindert versehentliche Doppel-Anlage desselben Objekts vom selben Makler. m²-Toleranz erlaubt 2 ETW im selben Haus als getrennte Deals.
+- AlertDialog ohne Radix-Alert-Dialog: 1 Datei, ~50 Zeilen, kein Package = kein Wartungsoverhead
+- Frontend-Transaktion: pragmatisch im Single-User-Setup, RPC kommt sowieso in Schritt 7 für den Aufteiler-Pfad
+
+### Konsequenzen
+- **Migration `008_step4_inserts.sql`**: RLS INSERT-Policies + GRANTs für anon auf `contacts`, `deals`, `activity_log`. UPDATE auf contacts war bereits aus Migration 004 vorhanden (`anon_update_contacts`).
+- **Pure Logic in `src/features/lead-create/leadCreateLogic.ts`**: testbar, falls Vitest später kommt — aktuell kein Test-Setup im Repo (GUIDELINES erlaubt das im MVP, kritische Logik ist trotzdem isoliert).
+- **`expose_local_path` aus dem Schnell-Tab raus**: nur `expose_url`. Lokaler Pfad kann via Inline-Edit später ergänzt werden — bzw. kommt erst im PDF-Tab (Schritt 5) sinnvoll rein.
+- **Tab "Mit PDF"**: disabled mit Hover-Hint "Kommt in Schritt 5". UI-Versprechen sichtbar.
+- **Bestehender Inline-Edit-Pfad bleibt der Default für Korrekturen**: Modal ist nur für Neu-Anlage.
+- **Bundle-Wachstum**: ~37 KB gzipped (rhf+zod+radix-tabs/label) — von 340 → 377 KB. Akzeptabel.
+
