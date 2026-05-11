@@ -39,21 +39,16 @@ import {
   type EditableContactField,
 } from "@/hooks/useUpdateContactField"
 import { useDistinctValues } from "@/hooks/useDistinctValues"
+import {
+  OBJECT_TYPE_DEFAULTS,
+  VERWENDUNG_DEFAULTS,
+  LEAD_SOURCE_DEFAULTS,
+} from "@/lib/constants"
 
 const STATUS_OPTIONS: { value: DealStatus; label: string }[] = [
   { value: "offen", label: "Offen" },
   { value: "berechnet", label: "Berechnet" },
   { value: "absage", label: "Absage" },
-]
-
-const OBJECT_TYPE_DEFAULTS = ["MFH", "ETW", "REH", "EFH", "DHH", "Bungalow"]
-const VERWENDUNG_DEFAULTS = ["B&H", "F&F"]
-const LEAD_SOURCE_DEFAULTS = [
-  "Online",
-  "Off-Market",
-  "Entrümpler",
-  "Direktkontakt",
-  "Auktion",
 ]
 
 const STORAGE_KEYS = {

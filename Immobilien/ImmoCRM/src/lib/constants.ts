@@ -13,3 +13,13 @@ export const STATUS_COLORS: Record<DealStatus, string> = {
 }
 
 export const SECTION_ORDER: DealStatus[] = ["berechnet", "offen", "absage"]
+
+export const OBJECT_TYPE_DEFAULTS = ["MFH", "ETW", "REH", "EFH", "DHH", "Bungalow"]
+export const VERWENDUNG_DEFAULTS = ["B&H", "F&F"]
+export const LEAD_SOURCE_DEFAULTS = [
+  "Online",
+  "Off-Market",
+  "Entrümpler",
+  "Direktkontakt",
+  "Auktion",
+]
