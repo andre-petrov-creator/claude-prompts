@@ -9,6 +9,7 @@ import { ChevronDown } from "lucide-react"
 import type { LeadRow, DealStatus } from "@/types/domain"
 import { SECTION_ORDER, STATUS_LABELS } from "@/lib/constants"
 import LeadFilters from "./LeadFilters"
+import LeadCreateModal from "@/features/lead-create/LeadCreateModal"
 
 type Props = {
   table: Table<LeadRow>
@@ -59,11 +60,14 @@ export default function LeadSections({
           <h2 className="text-xl font-semibold">Leads</h2>
           <p className="text-sm text-zinc-500">{total} insgesamt</p>
         </div>
-        <LeadFilters
-          table={table}
-          globalFilter={globalFilter}
-          setGlobalFilter={setGlobalFilter}
-        />
+        <div className="flex items-center gap-3">
+          <LeadFilters
+            table={table}
+            globalFilter={globalFilter}
+            setGlobalFilter={setGlobalFilter}
+          />
+          <LeadCreateModal />
+        </div>
       </div>
 
       {SECTION_ORDER.map((status) => (
