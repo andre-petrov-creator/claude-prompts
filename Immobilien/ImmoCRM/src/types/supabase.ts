@@ -199,6 +199,7 @@ export type Database = {
           preis_pro_m2: number | null
           status: Database["public"]["Enums"]["deal_status"]
           updated_at: string
+          verwendung: string | null
           wohnflaeche_m2: number | null
           zip: string | null
         }
@@ -224,6 +225,7 @@ export type Database = {
           preis_pro_m2?: number | null
           status?: Database["public"]["Enums"]["deal_status"]
           updated_at?: string
+          verwendung?: string | null
           wohnflaeche_m2?: number | null
           zip?: string | null
         }
@@ -249,6 +251,7 @@ export type Database = {
           preis_pro_m2?: number | null
           status?: Database["public"]["Enums"]["deal_status"]
           updated_at?: string
+          verwendung?: string | null
           wohnflaeche_m2?: number | null
           zip?: string | null
         }
@@ -304,6 +307,7 @@ export type Database = {
           preis_pro_m2: number | null
           status: Database["public"]["Enums"]["deal_status"] | null
           updated_at: string | null
+          verwendung: string | null
           wohnflaeche_m2: number | null
           zip: string | null
         }
@@ -331,6 +335,7 @@ export type Database = {
           preis_pro_m2?: number | null
           status?: Database["public"]["Enums"]["deal_status"] | null
           updated_at?: string | null
+          verwendung?: string | null
           wohnflaeche_m2?: number | null
           zip?: string | null
         }
@@ -358,6 +363,7 @@ export type Database = {
           preis_pro_m2?: number | null
           status?: Database["public"]["Enums"]["deal_status"] | null
           updated_at?: string | null
+          verwendung?: string | null
           wohnflaeche_m2?: number | null
           zip?: string | null
         }

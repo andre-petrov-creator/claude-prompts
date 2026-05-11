@@ -11,7 +11,7 @@ export const useDealNotes = (dealId: string | null) => {
         .from("deal_notes")
         .select("*")
         .eq("deal_id", dealId!)
-        .order("created_at", { ascending: false })
+        .order("created_at", { ascending: true })
       if (error) throw error
       return data ?? []
     },

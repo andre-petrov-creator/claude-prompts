@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import {
   useReactTable,
   getCoreRowModel,
@@ -7,6 +7,7 @@ import {
   type ColumnDef,
   type SortingState,
   type VisibilityState,
+  type ColumnSizingState,
 } from "@tanstack/react-table"
 import type { LeadRow, DealStatus } from "@/types/domain"
 import StatusBadge from "./StatusBadge"
@@ -14,7 +15,7 @@ import LeadSections from "./LeadSections"
 import ContactQuickInfo from "./ContactQuickInfo"
 import AnrufCell from "./AnrufCell"
 import BesichtigungCell from "./BesichtigungCell"
-import EditableDateCell from "./EditableDateCell"
+import ClickableDateCell from "./ClickableDateCell"
 import EditableTextCell from "./EditableTextCell"
 import EditableNumberCell from "./EditableNumberCell"
 import EditableSelectCell from "./EditableSelectCell"
@@ -45,7 +46,8 @@ const STATUS_OPTIONS: { value: DealStatus; label: string }[] = [
   { value: "absage", label: "Absage" },
 ]
 
-const OBJECT_TYPE_DEFAULTS = ["WHG", "MFH", "REH", "Bungalow", "EFH", "DHH"]
+const OBJECT_TYPE_DEFAULTS = ["MFH", "ETW", "REH", "EFH", "DHH", "Bungalow"]
+const VERWENDUNG_DEFAULTS = ["B&H", "F&F"]
 const LEAD_SOURCE_DEFAULTS = [
   "Online",
   "Off-Market",
@@ -54,20 +56,46 @@ const LEAD_SOURCE_DEFAULTS = [
   "Auktion",
 ]
 
+const COLUMN_SIZING_STORAGE_KEY = "immo-crm.leadTable.columnSizing"
+
 const dedupSorted = (a: string[], b: string[]) =>
   Array.from(new Set([...a, ...b])).sort((x, y) => x.localeCompare(y))
+
+const loadColumnSizing = (): ColumnSizingState => {
+  try {
+    const raw = localStorage.getItem(COLUMN_SIZING_STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as ColumnSizingState) : {}
+  } catch {
+    return {}
+  }
+}
 
 export default function LeadTable({ data }: { data: LeadRow[] }) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [globalFilter, setGlobalFilter] = useState("")
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(
+    () => loadColumnSizing(),
+  )
   const [panelDealId, setPanelDealId] = useState<string | null>(null)
   const [panelDealLabel, setPanelDealLabel] = useState("")
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        COLUMN_SIZING_STORAGE_KEY,
+        JSON.stringify(columnSizing),
+      )
+    } catch {
+      // localStorage full or disabled — silently ignore
+    }
+  }, [columnSizing])
 
   const updateDeal = useUpdateDealField()
   const updateContact = useUpdateContactField()
   const { data: leadSourceValues } = useDistinctValues("contacts", "lead_source")
   const { data: objectTypeValues } = useDistinctValues("deals", "object_type")
+  const { data: verwendungValues } = useDistinctValues("deals", "verwendung")
 
   const leadSourceOptions = useMemo(
     () => dedupSorted(LEAD_SOURCE_DEFAULTS, leadSourceValues ?? []),
@@ -76,6 +104,10 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
   const objectTypeOptions = useMemo(
     () => dedupSorted(OBJECT_TYPE_DEFAULTS, objectTypeValues ?? []),
     [objectTypeValues],
+  )
+  const verwendungOptions = useMemo(
+    () => dedupSorted(VERWENDUNG_DEFAULTS, verwendungValues ?? []),
+    [verwendungValues],
   )
 
   const patchDeal = (
@@ -204,7 +236,7 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         id: "besichtigung_datum",
         header: "Besichtigung",
         accessorKey: "besichtigung_datum",
-        size: 130,
+        size: 120,
         cell: ({ row }) => (
           <BesichtigungCell
             dealId={row.original.id!}
@@ -232,6 +264,25 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         ),
       },
       {
+        id: "object_type",
+        header: "Objekt",
+        accessorKey: "object_type",
+        size: 110,
+        cell: ({ row }) => (
+          <EditableComboboxCell
+            value={row.original.object_type}
+            options={objectTypeOptions}
+            onSave={(next) =>
+              patchDeal(
+                row.original.id!,
+                { object_type: next },
+                "Objekt geändert",
+              )
+            }
+          />
+        ),
+      },
+      {
         id: "address_full",
         header: "Adresse",
         accessorFn: (r) => `${r.address ?? ""} ${r.zip ?? ""} ${r.city ?? ""}`,
@@ -248,18 +299,18 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         ),
       },
       {
-        id: "object_type",
+        id: "verwendung",
         header: "Verwendung",
-        accessorKey: "object_type",
-        size: 120,
+        accessorKey: "verwendung",
+        size: 110,
         cell: ({ row }) => (
           <EditableComboboxCell
-            value={row.original.object_type}
-            options={objectTypeOptions}
+            value={row.original.verwendung ?? null}
+            options={verwendungOptions}
             onSave={(next) =>
               patchDeal(
                 row.original.id!,
-                { object_type: next },
+                { verwendung: next },
                 "Verwendung geändert",
               )
             }
@@ -372,7 +423,7 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         accessorKey: "angebot_datum",
         size: 130,
         cell: ({ row }) => (
-          <EditableDateCell
+          <ClickableDateCell
             value={row.original.angebot_datum}
             onSave={(iso) =>
               patchDeal(
@@ -439,16 +490,19 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         },
       },
     ],
-    [leadSourceOptions, objectTypeOptions],
+    [leadSourceOptions, objectTypeOptions, verwendungOptions],
   )
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, columnVisibility, globalFilter },
+    state: { sorting, columnVisibility, globalFilter, columnSizing },
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnSizingChange: setColumnSizing,
+    enableColumnResizing: true,
+    columnResizeMode: "onChange",
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),

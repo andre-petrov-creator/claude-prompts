@@ -11,6 +11,7 @@ export type EditableDealField =
   | "besichtigung_datum"
   | "angebot_datum"
   | "object_type"
+  | "verwendung"
   | "address"
   | "zip"
   | "city"

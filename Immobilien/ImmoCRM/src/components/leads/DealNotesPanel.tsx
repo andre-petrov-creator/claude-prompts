@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react"
 import {
   Sheet,
   SheetContent,
@@ -25,6 +26,13 @@ export default function DealNotesPanel({
 }: Props) {
   const { data: notes, isLoading } = useDealNotes(dealId)
   const { create, update, remove } = useDealNoteMutations(dealId ?? "")
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (scrollRef.current && notes && notes.length > 0) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [notes?.length, open])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -34,7 +42,10 @@ export default function DealNotesPanel({
           <SheetDescription className="truncate">{dealLabel}</SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto -mx-6 px-6 py-2">
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto -mx-6 px-6 py-2"
+        >
           {isLoading ? (
             <div className="text-zinc-500 text-sm py-4">Lädt…</div>
           ) : !notes || notes.length === 0 ? (

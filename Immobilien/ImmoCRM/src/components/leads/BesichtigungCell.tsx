@@ -1,4 +1,4 @@
-import EditableDateCell from "./EditableDateCell"
+import ClickableDateCell from "./ClickableDateCell"
 import { useUpdateDealField } from "@/hooks/useUpdateDealField"
 
 type Props = {
@@ -9,7 +9,7 @@ type Props = {
 export default function BesichtigungCell({ dealId, value }: Props) {
   const update = useUpdateDealField()
   return (
-    <EditableDateCell
+    <ClickableDateCell
       value={value}
       onSave={(iso) =>
         update.mutate({

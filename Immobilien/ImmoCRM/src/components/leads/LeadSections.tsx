@@ -59,7 +59,7 @@ export default function LeadSections({
           open={open[status]}
           onOpenChange={(v) => setOpen((prev) => ({ ...prev, [status]: v }))}
         >
-          <CollapsibleTrigger className="flex items-center gap-2 w-full text-left py-2 font-medium hover:bg-zinc-50">
+          <CollapsibleTrigger className="inline-flex items-center gap-2 text-left py-2 font-medium hover:bg-zinc-50 px-2 -ml-2 rounded">
             <ChevronDown
               className={`w-4 h-4 transition-transform ${
                 open[status] ? "" : "-rotate-90"
@@ -84,16 +84,30 @@ export default function LeadSections({
                       {hg.headers.map((h) => (
                         <th
                           key={h.id}
-                          className="px-3 py-2 text-left font-medium border-b cursor-pointer hover:bg-zinc-100 whitespace-nowrap overflow-hidden text-ellipsis"
-                          onClick={h.column.getToggleSortingHandler()}
+                          className="relative px-3 py-2 text-left font-medium border-b whitespace-nowrap overflow-hidden text-ellipsis select-none"
                         >
-                          {flexRender(
-                            h.column.columnDef.header,
-                            h.getContext(),
+                          <span
+                            onClick={h.column.getToggleSortingHandler()}
+                            className="cursor-pointer hover:text-zinc-900"
+                          >
+                            {flexRender(
+                              h.column.columnDef.header,
+                              h.getContext(),
+                            )}
+                            {{ asc: " ↑", desc: " ↓" }[
+                              h.column.getIsSorted() as string
+                            ] ?? ""}
+                          </span>
+                          {h.column.getCanResize() && (
+                            <span
+                              onMouseDown={h.getResizeHandler()}
+                              onTouchStart={h.getResizeHandler()}
+                              onClick={(e) => e.stopPropagation()}
+                              className={`absolute top-0 right-0 h-full w-1.5 cursor-col-resize select-none touch-none hover:bg-blue-400 ${
+                                h.column.getIsResizing() ? "bg-blue-500" : ""
+                              }`}
+                            />
                           )}
-                          {{ asc: " ↑", desc: " ↓" }[
-                            h.column.getIsSorted() as string
-                          ] ?? ""}
                         </th>
                       ))}
                     </tr>
