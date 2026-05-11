@@ -3,36 +3,28 @@ import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import type { Database } from "@/types/supabase"
 
-type DealUpdate = Database["public"]["Tables"]["deals"]["Update"]
+type ContactUpdate = Database["public"]["Tables"]["contacts"]["Update"]
 
-export type EditableDealField =
-  | "status"
-  | "letzter_anruf"
-  | "besichtigung_datum"
-  | "angebot_datum"
-  | "object_type"
-  | "address"
-  | "zip"
-  | "city"
-  | "wohnflaeche_m2"
-  | "preis_kauf"
-  | "kalk_verkaufspreis"
-  | "mein_angebot"
-  | "expose_url"
-  | "expose_local_path"
+export type EditableContactField =
+  | "name"
+  | "company"
+  | "phone"
+  | "email"
+  | "lead_source"
+  | "position"
 
-export const useUpdateDealField = () => {
+export const useUpdateContactField = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: {
-      dealId: string
-      patch: Partial<Record<EditableDealField, string | number | null>>
+      contactId: string
+      patch: Partial<Record<EditableContactField, string | null>>
       successMessage?: string
     }) => {
       const { error } = await supabase
-        .from("deals")
-        .update(args.patch as DealUpdate)
-        .eq("id", args.dealId)
+        .from("contacts")
+        .update(args.patch as ContactUpdate)
+        .eq("id", args.contactId)
       if (error) throw error
       return args
     },

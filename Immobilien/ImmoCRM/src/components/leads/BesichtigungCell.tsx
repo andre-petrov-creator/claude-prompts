@@ -14,8 +14,7 @@ export default function BesichtigungCell({ dealId, value }: Props) {
       onSave={(iso) =>
         update.mutate({
           dealId,
-          field: "besichtigung_datum",
-          value: iso,
+          patch: { besichtigung_datum: iso },
           successMessage: "Besichtigung aktualisiert",
         })
       }

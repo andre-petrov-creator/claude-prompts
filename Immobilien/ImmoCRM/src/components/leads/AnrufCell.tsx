@@ -54,8 +54,7 @@ export default function AnrufCell({ dealId, letzterAnruf }: Props) {
     const today = format(new Date(), "yyyy-MM-dd")
     update.mutate({
       dealId,
-      field: "letzter_anruf",
-      value: today,
+      patch: { letzter_anruf: today },
       successMessage: "Anruf eingetragen",
     })
     setHoverShowing(false)
@@ -65,8 +64,7 @@ export default function AnrufCell({ dealId, letzterAnruf }: Props) {
     if (!date) return
     update.mutate({
       dealId,
-      field: "letzter_anruf",
-      value: format(date, "yyyy-MM-dd"),
+      patch: { letzter_anruf: format(date, "yyyy-MM-dd") },
       successMessage: "Anruf-Datum gesetzt",
     })
     setDatepickerOpen(false)

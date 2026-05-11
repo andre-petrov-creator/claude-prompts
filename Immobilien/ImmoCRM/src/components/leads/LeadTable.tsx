@@ -12,9 +12,15 @@ import type { LeadRow, DealStatus } from "@/types/domain"
 import StatusBadge from "./StatusBadge"
 import LeadSections from "./LeadSections"
 import ContactQuickInfo from "./ContactQuickInfo"
-import ExposeLink from "./ExposeLink"
 import AnrufCell from "./AnrufCell"
 import BesichtigungCell from "./BesichtigungCell"
+import EditableDateCell from "./EditableDateCell"
+import EditableTextCell from "./EditableTextCell"
+import EditableNumberCell from "./EditableNumberCell"
+import EditableSelectCell from "./EditableSelectCell"
+import EditableComboboxCell from "./EditableComboboxCell"
+import EditableAddressCell from "./EditableAddressCell"
+import EditableExposeCell from "./EditableExposeCell"
 import DealNotesPanel from "./DealNotesPanel"
 import {
   formatCurrency,
@@ -23,19 +29,33 @@ import {
   isOverdue,
 } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
+import {
+  useUpdateDealField,
+  type EditableDealField,
+} from "@/hooks/useUpdateDealField"
+import {
+  useUpdateContactField,
+  type EditableContactField,
+} from "@/hooks/useUpdateContactField"
+import { useDistinctValues } from "@/hooks/useDistinctValues"
 
-const dash = (v: unknown) => (v == null || v === "" ? "" : String(v))
+const STATUS_OPTIONS: { value: DealStatus; label: string }[] = [
+  { value: "offen", label: "Offen" },
+  { value: "berechnet", label: "Berechnet" },
+  { value: "absage", label: "Absage" },
+]
 
-const formatAddress = (
-  street: string | null | undefined,
-  zip: string | null | undefined,
-  city: string | null | undefined,
-): string => {
-  const top = (street ?? "").trim()
-  const bottomParts = [zip, city].filter(Boolean).join(" ").trim()
-  if (top && bottomParts) return `${top}, ${bottomParts}`
-  return top || bottomParts
-}
+const OBJECT_TYPE_DEFAULTS = ["WHG", "MFH", "REH", "Bungalow", "EFH", "DHH"]
+const LEAD_SOURCE_DEFAULTS = [
+  "Online",
+  "Off-Market",
+  "Entrümpler",
+  "Direktkontakt",
+  "Auktion",
+]
+
+const dedupSorted = (a: string[], b: string[]) =>
+  Array.from(new Set([...a, ...b])).sort((x, y) => x.localeCompare(y))
 
 export default function LeadTable({ data }: { data: LeadRow[] }) {
   const [sorting, setSorting] = useState<SortingState>([])
@@ -44,11 +64,38 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
   const [panelDealId, setPanelDealId] = useState<string | null>(null)
   const [panelDealLabel, setPanelDealLabel] = useState("")
 
+  const updateDeal = useUpdateDealField()
+  const updateContact = useUpdateContactField()
+  const { data: leadSourceValues } = useDistinctValues("contacts", "lead_source")
+  const { data: objectTypeValues } = useDistinctValues("deals", "object_type")
+
+  const leadSourceOptions = useMemo(
+    () => dedupSorted(LEAD_SOURCE_DEFAULTS, leadSourceValues ?? []),
+    [leadSourceValues],
+  )
+  const objectTypeOptions = useMemo(
+    () => dedupSorted(OBJECT_TYPE_DEFAULTS, objectTypeValues ?? []),
+    [objectTypeValues],
+  )
+
+  const patchDeal = (
+    dealId: string,
+    patch: Partial<Record<EditableDealField, string | number | null>>,
+    successMessage = "Gespeichert",
+  ) => updateDeal.mutate({ dealId, patch, successMessage })
+
+  const patchContact = (
+    contactId: string,
+    patch: Partial<Record<EditableContactField, string | null>>,
+    successMessage = "Gespeichert",
+  ) => updateContact.mutate({ contactId, patch, successMessage })
+
   const openPanel = (row: LeadRow) => {
     setPanelDealId(row.id!)
-    setPanelDealLabel(
-      `${formatAddress(row.address, row.zip, row.city) || "—"} · ${row.contact.name}`,
-    )
+    const top = (row.address ?? "").trim()
+    const bottom = [row.zip, row.city].filter(Boolean).join(" ").trim()
+    const addr = [top, bottom].filter(Boolean).join(", ") || "—"
+    setPanelDealLabel(`${addr} · ${row.contact.name}`)
   }
 
   const columns = useMemo<ColumnDef<LeadRow>[]>(
@@ -57,16 +104,25 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         id: "status",
         header: "Status",
         accessorKey: "status",
-        size: 100,
+        size: 110,
         cell: ({ row }) => (
-          <StatusBadge status={row.original.status as DealStatus} />
+          <EditableSelectCell<DealStatus>
+            value={row.original.status as DealStatus}
+            options={STATUS_OPTIONS}
+            onSave={(next) =>
+              patchDeal(row.original.id!, { status: next }, "Status geändert")
+            }
+            display={(v) =>
+              v ? <StatusBadge status={v} /> : <span className="text-zinc-300">—</span>
+            }
+          />
         ),
       },
       {
         id: "name",
         header: "Name",
         accessorFn: (r) => r.contact.name,
-        size: 160,
+        size: 170,
         cell: ({ row }) => (
           <ContactQuickInfo
             name={row.original.contact.name}
@@ -81,22 +137,56 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         id: "company",
         header: "Firma",
         accessorFn: (r) => r.contact.company ?? "",
-        size: 140,
-        cell: ({ getValue }) => dash(getValue()),
+        size: 150,
+        cell: ({ row }) => (
+          <EditableTextCell
+            value={row.original.contact.company}
+            onSave={(next) =>
+              patchContact(
+                row.original.contact.id,
+                { company: next },
+                "Firma geändert",
+              )
+            }
+          />
+        ),
       },
       {
         id: "phone",
         header: "Telefon",
         accessorFn: (r) => r.contact.phone ?? "",
-        size: 130,
-        cell: ({ getValue }) => dash(getValue()),
+        size: 140,
+        cell: ({ row }) => (
+          <EditableTextCell
+            value={row.original.contact.phone}
+            onSave={(next) =>
+              patchContact(
+                row.original.contact.id,
+                { phone: next },
+                "Telefon geändert",
+              )
+            }
+          />
+        ),
       },
       {
         id: "email",
         header: "E-Mail",
         accessorFn: (r) => r.contact.email ?? "",
-        size: 200,
-        cell: ({ getValue }) => dash(getValue()),
+        size: 210,
+        cell: ({ row }) => (
+          <EditableTextCell
+            value={row.original.contact.email}
+            type="email"
+            onSave={(next) =>
+              patchContact(
+                row.original.contact.id,
+                { email: next },
+                "E-Mail geändert",
+              )
+            }
+          />
+        ),
       },
       {
         id: "letzter_anruf",
@@ -126,119 +216,188 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         id: "lead_source",
         header: "Lead-Herkunft",
         accessorFn: (r) => r.contact.lead_source ?? "",
-        size: 130,
-        cell: ({ getValue }) => dash(getValue()),
+        size: 140,
+        cell: ({ row }) => (
+          <EditableComboboxCell
+            value={row.original.contact.lead_source}
+            options={leadSourceOptions}
+            onSave={(next) =>
+              patchContact(
+                row.original.contact.id,
+                { lead_source: next },
+                "Lead-Herkunft geändert",
+              )
+            }
+          />
+        ),
       },
       {
         id: "address_full",
         header: "Adresse",
-        accessorFn: (r) => formatAddress(r.address, r.zip, r.city),
-        size: 220,
-        cell: ({ row }) => {
-          const top = (row.original.address ?? "").trim()
-          const bottomParts = [row.original.zip, row.original.city]
-            .filter(Boolean)
-            .join(" ")
-            .trim()
-          if (!top && !bottomParts) return ""
-          return (
-            <div className="leading-tight">
-              {top && <div>{top}</div>}
-              {bottomParts && (
-                <div className="text-xs text-zinc-500">{bottomParts}</div>
-              )}
-            </div>
-          )
-        },
+        accessorFn: (r) => `${r.address ?? ""} ${r.zip ?? ""} ${r.city ?? ""}`,
+        size: 230,
+        cell: ({ row }) => (
+          <EditableAddressCell
+            address={row.original.address}
+            zip={row.original.zip}
+            city={row.original.city}
+            onSave={(patch) =>
+              patchDeal(row.original.id!, patch, "Adresse geändert")
+            }
+          />
+        ),
       },
       {
         id: "object_type",
         header: "Verwendung",
         accessorKey: "object_type",
-        size: 110,
-        cell: ({ getValue }) => dash(getValue()),
+        size: 120,
+        cell: ({ row }) => (
+          <EditableComboboxCell
+            value={row.original.object_type}
+            options={objectTypeOptions}
+            onSave={(next) =>
+              patchDeal(
+                row.original.id!,
+                { object_type: next },
+                "Verwendung geändert",
+              )
+            }
+          />
+        ),
       },
       {
         id: "wohnflaeche_m2",
         header: "Wohnfläche",
         accessorKey: "wohnflaeche_m2",
-        size: 110,
-        cell: ({ getValue }) => {
-          const v = getValue()
-          return v == null || v === "" ? "" : formatM2(v as number)
-        },
+        size: 120,
+        cell: ({ row }) => (
+          <EditableNumberCell
+            value={row.original.wohnflaeche_m2}
+            onSave={(next) =>
+              patchDeal(
+                row.original.id!,
+                { wohnflaeche_m2: next },
+                "Wohnfläche geändert",
+              )
+            }
+            display={(v) => (v == null ? "" : formatM2(v))}
+          />
+        ),
       },
       {
         id: "preis_kauf",
         header: "Preis",
         accessorKey: "preis_kauf",
-        size: 110,
-        cell: ({ getValue }) => {
-          const v = getValue()
-          return v == null || v === "" ? "" : formatCurrency(v as number)
-        },
+        size: 120,
+        cell: ({ row }) => (
+          <EditableNumberCell
+            value={row.original.preis_kauf}
+            onSave={(next) =>
+              patchDeal(
+                row.original.id!,
+                { preis_kauf: next },
+                "Preis geändert",
+              )
+            }
+            display={(v) => (v == null ? "" : formatCurrency(v))}
+          />
+        ),
       },
       {
         id: "preis_pro_m2",
         header: "€/m²",
         accessorKey: "preis_pro_m2",
-        size: 90,
+        size: 100,
         cell: ({ getValue }) => {
-          const v = getValue()
-          return v == null || v === "" ? "" : formatCurrency(v as number)
+          const v = getValue() as number | null
+          return v == null ? "" : (
+            <span className="text-zinc-500">{formatCurrency(v)}</span>
+          )
         },
       },
       {
         id: "kalk_verkaufspreis",
         header: "Kalk Verkauf",
         accessorKey: "kalk_verkaufspreis",
-        size: 120,
-        cell: ({ getValue }) => {
-          const v = getValue()
-          return v == null || v === "" ? "" : formatCurrency(v as number)
-        },
+        size: 130,
+        cell: ({ row }) => (
+          <EditableNumberCell
+            value={row.original.kalk_verkaufspreis}
+            onSave={(next) =>
+              patchDeal(
+                row.original.id!,
+                { kalk_verkaufspreis: next },
+                "Kalk-Verkauf geändert",
+              )
+            }
+            display={(v) => (v == null ? "" : formatCurrency(v))}
+          />
+        ),
       },
       {
         id: "kalk_pro_m2",
         header: "Kalk €/m²",
         accessorKey: "kalk_pro_m2",
-        size: 100,
+        size: 110,
         cell: ({ getValue }) => {
-          const v = getValue()
-          return v == null || v === "" ? "" : formatCurrency(v as number)
+          const v = getValue() as number | null
+          return v == null ? "" : (
+            <span className="text-zinc-500">{formatCurrency(v)}</span>
+          )
         },
       },
       {
         id: "mein_angebot",
         header: "Mein Angebot",
         accessorKey: "mein_angebot",
-        size: 120,
-        cell: ({ getValue }) => {
-          const v = getValue()
-          return v == null || v === "" ? "" : formatCurrency(v as number)
-        },
+        size: 130,
+        cell: ({ row }) => (
+          <EditableNumberCell
+            value={row.original.mein_angebot}
+            onSave={(next) =>
+              patchDeal(
+                row.original.id!,
+                { mein_angebot: next },
+                "Angebot geändert",
+              )
+            }
+            display={(v) => (v == null ? "" : formatCurrency(v))}
+          />
+        ),
       },
       {
         id: "angebot_datum",
         header: "Angebot gültig",
         accessorKey: "angebot_datum",
-        size: 120,
-        cell: ({ getValue }) => {
-          const v = getValue() as string | null
-          return v ? formatDate(v) : ""
-        },
+        size: 130,
+        cell: ({ row }) => (
+          <EditableDateCell
+            value={row.original.angebot_datum}
+            onSave={(iso) =>
+              patchDeal(
+                row.original.id!,
+                { angebot_datum: iso },
+                "Angebots-Datum geändert",
+              )
+            }
+          />
+        ),
       },
       {
         id: "naechste_nachfass",
         header: "Nächste Nachfass",
         accessorKey: "naechste_nachfass",
-        size: 130,
+        size: 140,
         cell: ({ getValue }) => {
           const v = getValue() as string | null
           if (!v) return ""
           return (
             <span
-              className={cn(isOverdue(v) && "text-red-600 font-semibold")}
+              className={cn(
+                "text-zinc-500",
+                isOverdue(v) && "text-red-600 font-semibold",
+              )}
             >
               {formatDate(v)}
             </span>
@@ -248,11 +407,14 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
       {
         id: "expose",
         header: "Exposé",
-        size: 80,
+        size: 90,
         cell: ({ row }) => (
-          <ExposeLink
+          <EditableExposeCell
             url={row.original.expose_url}
             localPath={row.original.expose_local_path}
+            onSave={(patch) =>
+              patchDeal(row.original.id!, patch, "Exposé geändert")
+            }
           />
         ),
       },
@@ -260,7 +422,7 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         id: "notes",
         header: "Notizen",
         accessorKey: "notes_count",
-        size: 100,
+        size: 110,
         cell: ({ row, getValue }) => {
           const n = getValue() as number
           return (
@@ -277,7 +439,7 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         },
       },
     ],
-    [],
+    [leadSourceOptions, objectTypeOptions],
   )
 
   const table = useReactTable({
