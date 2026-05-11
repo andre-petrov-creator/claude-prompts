@@ -496,4 +496,64 @@ Daten leben **nur in Supabase** — nicht in Git. Festplatten-Tod oder Supabase-
 ### Entscheidung
 _offen — finale Entscheidung vor Daten-Migration_
 
+---
+
+## ADR-011 — Tiptap als Rich-Text-Editor + RLS pragmatisch für Single-User-Mutations
+
+- **Datum:** 2026-05-11
+- **Status:** Accepted (partielle Lockerung von ADR-008)
+- **Schritt:** 3 (Lead-Interaktionen)
+
+### Kontext
+
+Schritt 3 ist der erste Bauschritt mit Schreib-Operationen aus dem Frontend (Notizen anlegen/editieren/löschen, `letzter_anruf` updaten). Zwei Entscheidungen fallen zusammen:
+
+1. **Rich-Text-Editor:** Tiptap oder Lexical für deal_notes.
+2. **Mutations-Pfad:** ADR-008 erlaubt nur SELECT für anon. Wie werden Schreib-Operationen abgesichert?
+
+### Entscheidung
+
+**(a) Tiptap** als Rich-Text-Editor. StarterKit + Underline-Extension. Toolbar: Bold, Italic, Underline, BulletList, OrderedList. HTML in `deal_notes.content_html`.
+
+**(b) RLS pragmatisch erweitern** statt Edge-Function-Layer aufzubauen: Anon-Key bekommt INSERT/UPDATE/DELETE auf `deal_notes` und UPDATE auf `deals` (USING/WITH CHECK = `deleted_at IS NULL`). Frontend-Hook (`useUpdateDealField`) kontrolliert per Whitelist welche Spalten geändert werden — Postgres hat keine column-level RLS, daher Convention statt Constraint.
+
+### Begründung
+
+**Tiptap:**
+- Maintained, ProseMirror-basiert (Industriestandard)
+- Lexical ist Meta-spezifisch, weniger Drittanbieter-Extensions
+- StarterKit deckt Bold/Italic/Listen/Heading/HardBreak ab
+- HTML-Output direkt speicherbar, kein JSON-Serialization-Overhead
+
+**RLS pragmatisch statt Edge Functions:**
+- Single-User-Tool. André ist der einzige, der die URL kennt. Vercel-Domain ist nicht öffentlich indexiert.
+- Soft-Delete (ADR-004) schützt vor versehentlichem Datenverlust auch bei kompromittiertem Zugriff
+- Edge-Function-Layer wäre +2–3h pro Mutation-Schritt × Schritte 3, 4, 6, 7 = realistisch +10h Bau ohne Single-User-Value
+- YAGNI: wenn das Tool jemals „öffentlich" wird (Team-Erweiterung, Public-Beta), führen wir Supabase-Auth ein und stellen RLS auf `auth.uid() IS NOT NULL` um — ~1h Migration
+
+**Verworfen:**
+- Edge-Function-Layer für jede Mutation: vollständiger ADR-008-Compliance, aber 10× der Aufwand gegenüber dem realen Sicherheitsgewinn
+- Supabase Anonymous Auth + RLS auf `TO authenticated`: minimal stärker (Bot-Crawler-resistent), aber wer im Browser ist, hat trotzdem alles. Komplexität nicht gerechtfertigt.
+
+### Konsequenzen
+
+**Code-Stellen Schritt 3:**
+- Migration `002_step3_writes.sql` öffnet die Policies (ADR-008 für SELECT bleibt, INSERT/UPDATE/DELETE neu für `deal_notes` + UPDATE für `deals`)
+- Hooks (`useDealNoteMutations`, `useUpdateDealField`) gehen direkt gegen Supabase via Anon-Client
+- Tiptap-Bundle wächst ~80 KB gzipped (Bundle steigt von ~190 KB auf ~340 KB gzipped) — akzeptabel ohne Mobile-First-Anforderung; Lazy-Load via `React.lazy()` auf das Sheet beschränkbar in Schritt 10
+
+**Migrations-Pfad zu Auth (falls jemals nötig):**
+1. Supabase Auth aktivieren (Magic-Link oder Email/Pwd)
+2. Login-Page anlegen, App in `<RequireAuth>` wrappen
+3. Migration `003_auth.sql`: alle bestehenden Policies `TO anon` → `TO authenticated`, USING-Klauseln optional auf `auth.uid()` einschränken
+4. ADR-011 auf "Superseded by ADR-XXX" setzen
+
+**`expose_local_path`-Klick:** Browser blockieren `file://` aus `https://`-Origin (Chrome strikt, Firefox per Default-Policy). `ExposeLink.tsx` zeigt für lokale Pfade zusätzlich einen Copy-Button — User kopiert Pfad und öffnet in Explorer/OneDrive.
+
+**ADR-008 wird durch ADR-011 partiell präzisiert.** ADR-008 bleibt Master-Doc für die Architektur-Intention; ADR-011 dokumentiert die pragmatische Realität für die MVP-Phase.
+
+### Folge-Items (nicht ADR-blockierend)
+- Bei späterer Auth-Migration: ADR-008 Status auf "Superseded by ADR-XXX" setzen
+- Wenn Tiptap-Bundle in Schritt 10 (Polish) als Performance-Problem auffällt: Lazy-Load via `React.lazy()` auf das Sheet-Panel beschränken
+- shadcn-Calendar-Variante minimal selbst geschrieben (react-day-picker v9 statt v10) — falls Calendar weitere Features braucht (Range-Picker, Time-Picker), prüfen ob shadcn-CLI-Output zu v9 passt
 

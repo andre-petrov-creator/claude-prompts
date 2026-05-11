@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import Layout from "@/components/Layout"
 import LeadList from "@/pages/LeadList"
 import ContactList from "@/pages/ContactList"
+import { Toaster } from "@/components/ui/sonner"
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +23,7 @@ export default function App() {
           </Route>
         </Routes>
       </BrowserRouter>
+      <Toaster position="bottom-right" richColors />
     </QueryClientProvider>
   )
 }

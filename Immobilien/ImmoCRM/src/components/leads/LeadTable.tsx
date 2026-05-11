@@ -11,6 +11,10 @@ import {
 import type { LeadRow, DealStatus } from "@/types/domain"
 import StatusBadge from "./StatusBadge"
 import LeadSections from "./LeadSections"
+import ContactQuickInfo from "./ContactQuickInfo"
+import ExposeLink from "./ExposeLink"
+import AnrufCell from "./AnrufCell"
+import DealNotesPanel from "./DealNotesPanel"
 import {
   formatCurrency,
   formatDate,
@@ -23,6 +27,13 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [globalFilter, setGlobalFilter] = useState("")
+  const [panelDealId, setPanelDealId] = useState<string | null>(null)
+  const [panelDealLabel, setPanelDealLabel] = useState("")
+
+  const openPanel = (row: LeadRow) => {
+    setPanelDealId(row.id!)
+    setPanelDealLabel(`${row.address ?? "—"} · ${row.contact.name}`)
+  }
 
   const columns = useMemo<ColumnDef<LeadRow>[]>(
     () => [
@@ -38,6 +49,15 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         id: "name",
         header: "Makler",
         accessorFn: (r) => r.contact.name,
+        cell: ({ row }) => (
+          <ContactQuickInfo
+            name={row.original.contact.name}
+            phone={row.original.contact.phone}
+            email={row.original.contact.email}
+            company={row.original.contact.company}
+            position={row.original.contact.position}
+          />
+        ),
       },
       {
         id: "company",
@@ -58,7 +78,12 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         id: "letzter_anruf",
         header: "Anruf",
         accessorKey: "letzter_anruf",
-        cell: ({ getValue }) => formatDate(getValue() as string),
+        cell: ({ row }) => (
+          <AnrufCell
+            dealId={row.original.id!}
+            letzterAnruf={row.original.letzter_anruf}
+          />
+        ),
       },
       {
         id: "besichtigung_datum",
@@ -148,31 +173,30 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
       {
         id: "expose",
         header: "Exposé",
-        cell: ({ row }) => {
-          const url =
-            row.original.expose_url || row.original.expose_local_path
-          return url ? (
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-blue-600 hover:underline"
-              title={url}
-            >
-              🔗
-            </a>
-          ) : (
-            <span className="text-zinc-300">—</span>
-          )
-        },
+        cell: ({ row }) => (
+          <ExposeLink
+            url={row.original.expose_url}
+            localPath={row.original.expose_local_path}
+          />
+        ),
       },
       {
         id: "notes",
         header: "Notiz",
         accessorKey: "notes_count",
-        cell: ({ getValue }) => {
+        cell: ({ row, getValue }) => {
           const n = getValue() as number
-          return n > 0 ? `${n} Notiz${n > 1 ? "en" : ""}` : "—"
+          return (
+            <button
+              className="text-blue-600 hover:underline"
+              onClick={(e) => {
+                e.stopPropagation()
+                openPanel(row.original)
+              }}
+            >
+              {n > 0 ? `${n} Notiz${n > 1 ? "en" : ""}` : "+ Notiz"}
+            </button>
+          )
         },
       },
     ],
@@ -192,10 +216,21 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
   })
 
   return (
-    <LeadSections
-      table={table}
-      globalFilter={globalFilter}
-      setGlobalFilter={setGlobalFilter}
-    />
+    <>
+      <LeadSections
+        table={table}
+        globalFilter={globalFilter}
+        setGlobalFilter={setGlobalFilter}
+        onRowClick={openPanel}
+      />
+      <DealNotesPanel
+        dealId={panelDealId}
+        dealLabel={panelDealLabel}
+        open={panelDealId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPanelDealId(null)
+        }}
+      />
+    </>
   )
 }

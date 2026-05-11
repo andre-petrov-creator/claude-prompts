@@ -10,6 +10,9 @@ export type ContactStatus = Database["public"]["Enums"]["contact_status"]
 export type DealStatus = Database["public"]["Enums"]["deal_status"]
 
 export type LeadRow = DealWithFollowup & {
-  contact: Pick<Contact, "id" | "name" | "email" | "phone" | "company" | "lead_source">
+  contact: Pick<
+    Contact,
+    "id" | "name" | "email" | "phone" | "company" | "position" | "lead_source"
+  >
   notes_count: number
 }

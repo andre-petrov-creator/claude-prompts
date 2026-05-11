@@ -10,7 +10,7 @@ export const useDeals = () => {
         supabase.from("deals_with_followup").select("*"),
         supabase
           .from("contacts")
-          .select("id, name, email, phone, company, lead_source"),
+          .select("id, name, email, phone, company, position, lead_source"),
         supabase.from("deal_notes").select("deal_id"),
       ])
       if (dealsRes.error) throw dealsRes.error
@@ -35,6 +35,7 @@ export const useDeals = () => {
             email: null,
             phone: null,
             company: null,
+            position: null,
             lead_source: null,
           },
           notes_count: notesCountByDeal.get(d.id!) ?? 0,

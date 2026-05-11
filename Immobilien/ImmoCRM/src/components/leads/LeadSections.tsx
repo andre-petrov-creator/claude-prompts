@@ -14,12 +14,14 @@ type Props = {
   table: Table<LeadRow>
   globalFilter: string
   setGlobalFilter: (v: string) => void
+  onRowClick?: (row: LeadRow) => void
 }
 
 export default function LeadSections({
   table,
   globalFilter,
   setGlobalFilter,
+  onRowClick,
 }: Props) {
   const rowsByStatus: Record<DealStatus, Row<LeadRow>[]> = {
     offen: [],
@@ -103,7 +105,13 @@ export default function LeadSections({
                     </tr>
                   ) : (
                     rowsByStatus[status].map((row) => (
-                      <tr key={row.id} className="border-b hover:bg-zinc-50">
+                      <tr
+                        key={row.id}
+                        className={`border-b hover:bg-zinc-50 ${
+                          onRowClick ? "cursor-pointer" : ""
+                        }`}
+                        onClick={() => onRowClick?.(row.original)}
+                      >
                         {row.getVisibleCells().map((cell) => (
                           <td
                             key={cell.id}
