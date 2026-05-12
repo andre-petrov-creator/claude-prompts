@@ -1,0 +1,3 @@
+# Objekt-Daten gehören nicht ins Repo (persönliche Adressen, Mietverträge, PDFs)
+runs/*
+!runs/.gitkeep
