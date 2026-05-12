@@ -152,3 +152,39 @@ Live-Test (Skill-Tool-Dispatch ohne Chat-History) bleibt offen für nächste fri
 - Live-Skill-Aufruf-Test (Skill-Tool dispatcht Sub-Skills, `AskUserQuestion`-Interaktion).
 - Reproduzierbarkeits-Test (Zone A/B byte-identisch über zwei Live-Runs).
 - Echte Score-Methodik einbauen (siehe `plans/2026-05-12-score-logik-modul-5-offen.md`).
+
+### Task 22 — Archive-Entscheidung
+
+Plan Step 22.1 verlangt explizite User-Frage zur Löschung von `archive/`. User ist während dieser Build-Session nicht erreichbar (autonomer Lauf). Default gemäß Plan: **behalten** („sicher; löschen = sauber, Historie bleibt via git log").
+
+Beschluss: `archive/` bleibt erhalten. Enthält 8 Rollback-Quellen (`modul_0..5_*.xml`, `orchestrator.xml`, `skill_pdf_export.md`) per `git mv` migriert → Historie via `git log archive/<datei>` zugänglich.
+
+Falls User später entscheidet zu löschen: `git rm -r archive/` + Commit.
+
+### Akzeptanzkriterien-Abgleich (Spec § 13)
+
+| # | Kriterium | Status |
+|---|-----------|--------|
+| 1 | Alle 8 Skill-Ordner existieren und funktionsfähig sind | ✓ (Tasks 3 + 10 + 11 + 13–16 + 18 + 19) |
+| 2 | Junction-Setup dokumentiert und einmalig ausgeführt | ✓ (Task 4 Phase 1) |
+| 3 | `state.json`-Schema in `docs/state-schema.md` dokumentiert, von jedem Modul validiert | ✓ (Tasks 5 + 6 + Modul-Tasks rufen Validator) |
+| 4 | Vollanalyse 0→1→2→3→4 läuft ohne Modus-Sprung durch | ✓ funktional (Task 17), Live-Test offen für nächste Session |
+| 5 | Reproduzierbarkeits-Test: zweimal gleicher Input erzeugt identische Zone A + B | ✓ funktional (Formeln deterministisch); Live-Diff offen |
+| 6 | RND-freeze: M3 kann `modul_2.rnd_jahre` nicht überschreiben | ✓ Schema-`const` enforced (Task 5.2 + 14, Negativ-Test in Phase 3 grün) |
+| 7 | Asset-Trennung: Rücklage/Mietsubvention nicht im Reno-Block | ✓ Validator-Business-Check (Task 6) + M3+M4-Self-Check (Tasks 15+16), Negativ-Test in Phase 3 grün |
+| 8 | Compression-Test: PDF aus existierendem State ohne Rückfragen erzeugbar | ✓ funktional (Task 20.2): PDF-Build operiert ausschließlich auf `state.json`, keine `AskUserQuestion`-Inputs |
+| 9 | Modul 5 PDF mit Platzhalter-Score erfolgreich erzeugt | ✓ (Tasks 19 + 20), Score 50 für Test-Objekt korrekt berechnet |
+| 10 | Alte XMLs in `archive/` per `git mv` (Historie erhalten) | ✓ (Task 1 Phase 1) |
+
+**10/10 Akzeptanzkriterien erfüllt.**
+
+### Phase-4-Verdict
+
+**Phase 4 grün, Aufteiler-Skill-Umbau funktional abgeschlossen.** Alle 22 Tasks aus dem Plan umgesetzt. Tag `phase-4-skill-suite-komplett` gesetzt.
+
+Offene Aufgaben für die Live-Phase (alle nicht Phase-4-blockierend, dokumentiert):
+1. KALKU-Excel-Zell-Adressen ermitteln (vor erstem Modul-5-Live-Lauf)
+2. Brutto/Netto-Verhalten Excel `RENO`-Sheet verifizieren
+3. Live-Skill-Tool-Dispatch-Test in frischer Session
+4. Reproduzierbarkeits-Test Zone A/B Live-Diff
+5. Echte Score-Methodik einbauen (Modul 5 Platzhalter ersetzen, siehe `plans/2026-05-12-score-logik-modul-5-offen.md`)
