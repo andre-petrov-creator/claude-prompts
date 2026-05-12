@@ -63,7 +63,7 @@ src/                                                  (BESTEHEND, ERWEITERN)
 
 docs/
 ├── 02_implementierungsplan.md                        Schritt 7 ersetzen
-├── 03_decisions.md                                   ADR-017 bis ADR-020
+├── 03_decisions.md                                   ADR-017 bis ADR-021
 ├── 04_progress.md                                    Sub-Schritte 7a-7l tracken
 ├── 05_tools.md                                       Skill-Matrix erweitern
 └── 06_pipeline_guidelines.md                         NEU: Pipeline-spezifische Conventions
@@ -2403,7 +2403,7 @@ Jeder Stage-Worker-Lauf schreibt `console.log({ stage, messageId, durationMs })`
 
 ## Fehler-Strategie
 - Stage-spezifische Fehler (Adress-Extraktion fail) → Lead trotzdem anlegen mit Fallback-Markern, `mail_queue.error_msg` füllen
-- Pipeline-Fatal (kein Supabase-Connect) → mail_queue bleibt auf `processing`, Cron-job.org-Failure-Mail an User
+- Pipeline-Fatal (kein Supabase-Connect) → mail_queue bleibt auf `processing`, in Vercel-Logs prüfen (oder Vercel-Log-Drain-Alert konfigurieren)
 - Niemals OneDrive-Upload-Fail blockt CRM-Insert (Workaround: Workspace-Pfad bleibt null, User sieht in der UI dass Datei fehlt)
 
 ## Idempotenz-Garantie
@@ -2435,7 +2435,7 @@ Falls unter 17/20: in `04_progress.md` notieren, welche Mails verloren gegangen 
 
 ```powershell
 git add docs/
-git commit -m "docs(schritt-7): pipeline cloud abgeschlossen, ADR-017-020, stichprobe 17/20"
+git commit -m "docs(schritt-7): pipeline cloud abgeschlossen, ADR-017-021, stichprobe 17/20"
 ```
 
 ---
