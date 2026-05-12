@@ -4,75 +4,91 @@ Big Picture des MFH-Aufteiler-Workflow-Systems. Detail pro Komponente in den jew
 
 ============================================================
 
-## System-Übersicht
+## Architektur ab 2026-05-12 (Skill-Suite)
+
+Seit 2026-05-12 läuft die Aufteiler-Analyse als **Markdown-Skill-Suite in Claude Code** (vorher: XML-Module in Web-Claude, siehe Sektion „Architektur vor 2026-05-12" unten — **veraltet, nur Rollback-Quelle**).
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  Web-Claude (claude.ai Projekt "Aufteiler")                      │
-│  Projektanweisung = orchestrator.xml                             │
+│  Claude Code (lokal)                                             │
+│  - User triggert Skill "aufteiler" (Orchestrator)                │
+│  - Skills sichtbar via Junctions ~/.claude/skills/aufteiler*     │
 └─────────────────────────┬────────────────────────────────────────┘
                           │
-                          │ web_fetch (raw.githubusercontent.com)
+                          │ Skill-Tool dispatcht Sub-Skills
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  GitHub: meine-projekte/Immobilien/Aufteiler/                    │
+│  Skill-Suite (skills/)                                           │
 │                                                                  │
-│  ├─ orchestrator.xml          (Routing, Sequenzierung)           │
-│  ├─ modul_0_quickcheck.xml    (ETW-Konsens, Gap-Schwelle)        │
-│  ├─ modul_1_objektbasis.xml   (WE-Liste, BRW, Gebäudeanteil)     │
-│  ├─ modul_2_massnahmen.xml    (Sanierung, Energetik, EnEV)       │
-│  ├─ modul_3_rnd_afa.xml       (Restnutzungsdauer, AfA-Korridor)  │
-│  ├─ modul_4_miete.xml         (Mietspiegel, §558/§559 BGB)       │
-│  ├─ modul_5_verdict.xml       (PDF + Excel-Notizen, on-demand)   │
-│  └─ skill_pdf_export.md       (Layout-Regeln R1-R13 für M5)      │
+│  ├─ aufteiler/                       Orchestrator (Dispatcher)   │
+│  ├─ aufteiler-modul-0-quickcheck/    Angebot vs. ETW-Konsens     │
+│  ├─ aufteiler-modul-1-objektbasis/   WE-Liste, BRW, Gebäudeanteil│
+│  ├─ aufteiler-modul-2-rnd-afa/       RND + AfA (rnd_frozen)      │
+│  ├─ aufteiler-modul-3-massnahmen/    Reno-Kosten + RND-Gutachten │
+│  ├─ aufteiler-modul-4-miete/         Mietspiegel + §558 + Subv.  │
+│  ├─ aufteiler-modul-5-deal-bewertung/Score + PDF + Excel-Befüllg.│
+│  └─ aufteiler-pdf-export/            Form-Skill für Modul 5      │
 └─────────────────────────┬────────────────────────────────────────┘
                           │
-            ┌─────────────┼─────────────┐
-            ▼             ▼             ▼
-┌──────────────────┐ ┌──────────┐ ┌──────────────────────┐
-│  Notion-DBs      │ │  Excel   │ │  PDF (Modul 5 only)  │
-│  (read-only)     │ │  Template│ │  reportlab+matplotlib│
-│                  │ │  pro Obj.│ │  → Aufteiler_<...>.pdf│
-│  Mietspiegel NRW │ │  kopiert │ └──────────────────────┘
-│  ImmoWertV       │ └──────────┘
-│  EnEV NRW        │
-│  Stadt-Marktdat. │
-└──────────────────┘
+            ┌─────────────┼─────────────┬──────────────────┐
+            ▼             ▼             ▼                  ▼
+┌──────────────────┐ ┌──────────┐ ┌──────────────┐ ┌───────────────┐
+│  Notion-DBs      │ │  Excel   │ │  state.json  │ │  PDF (M5 only)│
+│  (read-only)     │ │  Template│ │  pro Objekt  │ │  reportlab    │
+│                  │ │  pro Obj.│ │  unter       │ │  +matplotlib  │
+│  Mietspiegel NRW │ │  kopiert │ │  runs/<slug>/│ │  → Aufteiler_ │
+│  ImmoWertV       │ │ befüllt  │ │ JSON-Schema  │ │   <…>.pdf     │
+│  EnEV NRW        │ │ via      │ │ validiert    │ └───────────────┘
+│  Stadt-Marktdat. │ │ openpyxl │ │ (jsonschema) │
+└──────────────────┘ └──────────┘ └──────────────┘
 ```
 
 ============================================================
 
 ## Komponenten-Verantwortlichkeiten
 
-### Orchestrator (`orchestrator.xml`)
+### Orchestrator (`skills/aufteiler/SKILL.md`)
 
 - **Modus erkennen** aus User-Input (`vollanalyse`, `nur_quickcheck`, `nur_export` etc.)
-- **Modul-Sequenz routen** je nach Modus
-- **Module via web_fetch laden** (kein Inline-Code)
+- **State init / laden** unter `runs/<slug>/state.json`
+- **Sub-Skills via `Skill`-Tool dispatchen** (kein Inline-Code, kein Modul-zu-Modul-Aufruf)
 - **Freigaben einholen** zwischen Modulen (`go`/`weiter`/`ja`/`ok`)
-- **Excel-Handoff orchestrieren** (welches Modul liefert in welche Zelle)
-- **Rechnet selbst NICHTS**
+- **Rechnet selbst NICHTS**, interpretiert Modul-Outputs nicht.
 
-### Module (`modul_*.xml`)
+### Module (`skills/aufteiler-modul-N-*/SKILL.md`)
 
-Jedes Modul ist autark und liefert:
-- Strukturierten Chat-Output (Tabellen, Empfehlungen)
-- Excel-Transfer-Block (Werte für definierte Zellen)
-- Logging-Hinweise für Spätere (Annahmen, Quellen)
+Jedes Modul liest aus `state.json` (definierte Vorgänger-Felder), erzeugt drei Zonen:
+- **Zone A** — Daten-Block in pixel-identischer Tabellen-Form (reproduzierbar)
+- **Zone B** — Tiefenstufen-Deklaration (genau zwei Zeilen, byte-identisch)
+- **Zone C** — Begründung (Struktur fix: Annahmen / Risiken / Empfehlung; Formulierung frei)
 
-Module rufen **einander nicht direkt auf**. Datenfluss zwischen Modulen läuft über Chat-Kontext + Excel.
+Schreibt eigenen `modul_N`-Block in `state.json` (komplettes Objekt, nicht patchen). Module rufen einander nicht auf — der Orchestrator sequenziert.
 
-### Skills (`skill_*.md`)
+### Skills (Form / Layout)
 
-Form-/Layout-Regeln + technische Bausteine. Beispiel `skill_pdf_export.md`: Spaltenbreiten, Word-Wrap, Farbpalette, reportlab-Code-Snippets. Wird vom konsumierenden Modul per `web_fetch` vor der Ausführung geladen (Pflicht).
+`aufteiler-pdf-export` (Form-Skill): reportlab-Layout-Regeln R1–R13 (Spaltenbreiten, Word-Wrap, Farbpalette, keine Emojis). Wird ausschließlich von Modul 5 aufgerufen. Modul 5 bleibt für Inhalt zuständig, der Form-Skill für Layout.
+
+### State (`runs/<slug>/state.json`)
+
+Persistenter Daten-Container pro Objekt. Schema-Version `1.0`, validiert via:
+- **Markdown-Doku:** `docs/state-schema.md`
+- **JSON Schema (maschinell):** `docs/state.schema.json` (Draft 2020-12)
+- **CLI-Validator:** `python tools/validate_state.py runs/<slug>/state.json`
+
+Schema-Constraints enforced:
+- `modul_2.rnd_frozen === true` — Schema-`const`, Modul 3/5 können RND nicht überschreiben
+- Asset-Trennung: `modul_3.massnahmen_liste[]` enthält kein `subvention`/`rücklage`/`ruecklage`
+- Plausibilitäts-Grenzen (BRW > 0, RND 20–80, AfA 0–10 %, Mod-Score 0–100, etc.)
+
+`runs/` ist **gitignored** (enthält personenbezogene Mieter-Daten + Adressen).
 
 ### Excel-Template (`template/Kalkulation_Aufteiler_mit_VK_CF.xlsx`)
 
-Die eigentliche Rechen-Maschine. Module liefern nur Inputs in definierte Zellen — alle Multiplikationen, Summen, IF-Logik passieren in den Excel-Formeln. Sheet-Namen und Zell-Adressen sind Vertrag (siehe `excel_handoff.md` sobald angelegt).
+Die eigentliche Rechen-Maschine. Modul 5 kopiert das Template nach `runs/<slug>/Kalkulation_<Straßenkurz>.xlsx` und befüllt definierte Zellen via `openpyxl`. Excel-Formeln rechnen Multiplikationen, Summen, §559-Umlage etc. Zell-Verträge in [`docs/excel_handoff.md`](excel_handoff.md).
 
 ### Notion-DBs (read-only)
 
-Nachschlagewerke für Mietspiegel, Restnutzungsdauer-Regelwerk, Energetik-Maßnahmen, Stadt-Marktdaten. IDs in `../README.md`. Werden modulintern referenziert, niemals beschrieben.
+Nachschlagewerke für Mietspiegel, RND-Regelwerk, Energetik-Massnahmen, Stadt-Marktdaten. Page-IDs in [`../README.md`](../README.md). Werden modulintern referenziert (über MCP), niemals beschrieben.
 
 ============================================================
 
@@ -82,21 +98,31 @@ Nachschlagewerke für Mietspiegel, Restnutzungsdauer-Regelwerk, Energetik-Maßna
 User-Trigger ("Vollanalyse <Objekt>")
        │
        ▼
-[Orchestrator erkennt Modus]
+[Orchestrator erkennt Modus, init State runs/<slug>/state.json]
        │
        ▼
-Modul 0 ──► (Freigabe?) ──► Modul 1 ──► (Freigabe?) ──► Modul 2
-                                                            │
-                                                       (Freigabe?)
-                                                            │
-       ┌─────────── Modul 4 ◄── (Freigabe?) ◄── Modul 3 ◄───┘
+Modul 0 (Quick-Check) ──► (Freigabe go/weiter?) ──► Modul 1 (Objektbasis)
+                                                       │
+                                                  (Freigabe?)
+                                                       │
+   Modul 2 (RND/AfA, rnd_frozen=true) ◄────────────────┘
        │
   (Freigabe?)
        │
        ▼
-[Orchestrator fragt: "PDF-Export gewünscht?"]
+   Modul 3 (Massnahmen, Asset-Trennung enforced)
        │
-       ├── ja ──► Modul 5 (lädt skill_pdf_export.md, erzeugt PDF)
+  (Freigabe?)
+       │
+       ▼
+   Modul 4 (Miete, Option C: M6 vor Sanierung)
+       │
+  (Freigabe?)
+       │
+       ▼
+[Orchestrator: "PDF-Export gewünscht?"]
+       │
+       ├── ja ──► Modul 5 (Score + PDF + Excel-Befüllung)
        └── nein ─► Sequenz-Ende
 ```
 
@@ -106,22 +132,36 @@ Modul 0 ──► (Freigabe?) ──► Modul 1 ──► (Freigabe?) ──► 
 
 ## Daten-Verträge (Schnittstellen-Übersicht)
 
-| Modul | Liest aus | Schreibt nach (Excel) | Referenziert |
-|-------|-----------|------------------------|--------------|
-| M0 | User-Inputs | Quick-Check-Block | Stadt-Marktdaten (Notion) |
-| M1 | M0-Output | Objektbasis-Block, `MIETER`-Stammdaten | BORIS.NRW (User-manuell) |
-| M2 | M1-Output | Maßnahmen-Block, EnEV-Bewertung | EnEV NRW (Notion) |
-| M3 | M1+M2-Output | RND, AfA-Korridor | ImmoWertV 2021 Anlage 2 (Notion) |
-| M4 | M1-Output, Mietverträge | `MIETER!Y8:Y27`, `VK_CF`, `VERKAUFSMATRIX` | Mietspiegel NRW (Notion) |
-| M5 | M0-M4 Chat-Outputs + befüllte Excel | Notizen/Comments in Excel + neue PDF-Datei | `skill_pdf_export.md` (Pflicht) |
+| Modul | Liest aus State | Schreibt nach State | Schreibt nach Excel | Notion-DBs |
+|-------|-----------------|---------------------|---------------------|------------|
+| M0 | `objekt` | `modul_0` | – | Stadt-Marktdaten (optional) |
+| M1 | `objekt`, `modul_0.status` | `modul_1` | (via M5) MIETER A8..I, KALKU | BORIS.NRW (User-manuell) |
+| M2 | `modul_1.we_liste` | `modul_2` (mit `rnd_frozen=true`) | (via M5) KALKU C26..C28 | ImmoWertV RND-Regelwerk |
+| M3 | `modul_1.we_liste`, `modul_2.rnd_*` | `modul_3` | (via M5) RENO-Block | EnEV NRW |
+| M4 | `modul_1.we_liste`, `modul_2.mod_score` (optional) | `modul_4` | (via M5) MIETER M6/P6/Y, RENO!K105 | Mietspiegel NRW |
+| M5 | alle `modul_0..4` | `modul_5` (Score, PDF-Pfad, Excel-Pfad) | befüllt Excel-Kopie, schreibt PDF | – |
 
-Detail-Verträge (welche Zelle, welcher Typ) gehören in die jeweilige `docs/modul_*.md` und in `docs/excel_handoff.md`.
+Detail-Verträge (welche Zelle, welcher Typ) in [`docs/excel_handoff.md`](excel_handoff.md).
 
 ============================================================
 
 ## Versionierungs-Strategie auf System-Ebene
 
-- **Module versionieren unabhängig.** M3 v2.1 koexistiert mit M4 v2.2. Orchestrator ist agnostisch — er lädt `file=...` ohne Version-Pin.
-- **Orchestrator versioniert sich selbst** und trackt im Header-Comment, welche Modul-Versions-Erwartungen drinstecken (siehe `orchestrator.xml` v2.4 als Vorlage).
-- **Breaking Change in einem Modul** = Major-Bump in dem Modul + Hinweis im Orchestrator-Header, ggf. Orchestrator-Bump wenn Sequenz-Logik betroffen.
-- **Skill-Bump** muss im konsumierenden Modul erwähnt werden (Modul referenziert Skill ohne Version, aber Skill-Erwartung steht im Modul-Header).
+- **Skills versionieren unabhängig.** v1.0 für Module 0–5, v1.2 für `aufteiler-pdf-export`. Der Orchestrator ist agnostisch — er dispatcht via Skill-Name ohne Version-Pin.
+- **State-Schema-Bumps** (z.B. v1.1 für neue Felder) werden in `docs/state-schema.md` versioniert. State-Migration via separates Skript falls nötig (bisher keine Migrationen).
+- **Breaking Change in einem Modul** = Major-Bump in dem Modul + Hinweis im Skill-Header, ggf. Schema-Bump wenn Schreib-Vertrag betroffen.
+- **PDF-Form-Skill-Bump** muss in Modul 5 erwähnt werden (Modul referenziert Form-Skill ohne Version, aber Form-Erwartung steht im Modul-Header).
+
+============================================================
+
+## Architektur vor 2026-05-12 (XML-Module / Web-Claude) — **Veraltet**
+
+Vorher lief das System als XML-Modul-Suite, geladen per `web_fetch` von Web-Claude (claude.ai-Projekt „Aufteiler"). Module: `orchestrator.xml`, `modul_0_quickcheck.xml`, …, `modul_5_verdict.xml`, plus `skill_pdf_export.md`. Quelle: GitHub-Repo, `web_fetch` von `raw.githubusercontent.com`.
+
+Alle XML-Module wurden per `git mv` nach `archive/` migriert; Historie via `git log archive/<datei>` rekonstruierbar. Diese Architektur ist **veraltet** und sollte nicht mehr verwendet werden — siehe `archive/` als Rollback-Quelle.
+
+Wesentliche Unterschiede neue vs. alte Architektur:
+- **State**: neu `runs/<slug>/state.json` JSON, alt: Chat-Kontext (volatil, nicht reproduzierbar nach Compression)
+- **Modul-Dispatch**: neu Skill-Tool, alt: `web_fetch` von GitHub
+- **Validation**: neu JSON-Schema-Validator + Asset-Trennung-Business-Check, alt: nur Modul-interne Self-Checks
+- **Sichtbarkeit**: neu Junctions in `~/.claude/skills/`, alt: keine — Modul-Aufrufe gingen direkt durch `web_fetch`
