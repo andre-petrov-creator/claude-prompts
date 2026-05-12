@@ -6,7 +6,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import QuickLeadForm from "./QuickLeadForm"
@@ -26,28 +25,11 @@ export default function LeadCreateModal() {
           <DialogHeader>
             <DialogTitle>Neuer Lead</DialogTitle>
             <DialogDescription>
-              Off-Market schnell erfassen oder Exposé per PDF einlesen.
+              Off-Market schnell erfassen. Automatische Befüllung läuft über den Aufteiler-Workflow.
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="quick" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="quick">Schnell</TabsTrigger>
-              <TabsTrigger value="pdf" disabled title="Kommt in Schritt 5">
-                Mit PDF
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="quick">
-              <QuickLeadForm onSuccess={() => setOpen(false)} />
-            </TabsContent>
-
-            <TabsContent value="pdf">
-              <div className="text-sm text-zinc-500 p-8 text-center">
-                Verfügbar ab Schritt 5 (PDF-Drag-Drop).
-              </div>
-            </TabsContent>
-          </Tabs>
+          <QuickLeadForm onSuccess={() => setOpen(false)} />
         </DialogContent>
       </Dialog>
     </>

@@ -2,7 +2,7 @@
 
 Status pro Bauschritt aus [02_implementierungsplan.md](02_implementierungsplan.md). Wird nach **jedem** Schritt aktualisiert.
 
-**Legende:** ⬜ offen · 🟡 in Arbeit · ✅ fertig · ❌ blockiert
+**Legende:** ⬜ offen · 🟡 in Arbeit · ✅ fertig · ❌ verworfen / blockiert
 
 ---
 
@@ -31,7 +31,7 @@ Status pro Bauschritt aus [02_implementierungsplan.md](02_implementierungsplan.m
 | 2 | Lead-Liste UI (read-only) | ✅ | 2026-05-11 | — | TanStack Table mit 21 Spalten, 3 Sektionen, Status-Badges, Sortierung, globale Suche, Spalten-Sichtbarkeit, react-query, Router (Leads/Kontakte). Demo-Seed: 3 Makler + 5 Deals (1 überfällig). Visual-Akzeptanz 10/10 bestätigt. Schritt-2-Polish (spaltenspezifische Filter) auf Schritt 10 verschoben. |
 | 3 | Lead-Liste Interaktionen | ✅ | 2026-05-11 | 011 | Quick-Info-Popover (Tel/Email/Firma/Position + 1-Click-Copy mit Toast), Slide-In-Panel (Sheet) mit Tiptap-Editor (Bold/Italic/Underline/BulletList/OrderedList), Edit/Delete pro Notiz mit Hover-Icons + `window.confirm`, Exposé-Icon blau/grau + file:// Copy-Fallback, Anruf-Hover-Button (1s-Timer mit useEffect-Cleanup) + Rechtsklick-Datepicker. Migration 002: RLS für deal_notes-CRUD + deals-UPDATE geöffnet (ADR-011). shadcn-Calendar selbst geschrieben für react-day-picker v9. |
 | 4 | Manueller Lead | ✅ | 2026-05-11 | 012 | Modal mit Tabs (Schnell aktiv, PDF disabled), shadcn dialog/tabs/alert-dialog/label-Wrapper, react-hook-form+zod, Combobox-Pattern aus EditableComboboxCell wiederverwendet. Duplikat-Check zweistufig: Hard (Email) → non-destruktiver Merge, Soft (Name + keine Email) → 3-Wege-AlertDialog, Deal-Dup auf address+zip(+m²) → User-Choice "trotzdem anlegen". Activity-Log-Eintrag "new_lead". Status-Default berechnet/offen via pure-function. Migration 008 öffnet RLS+GRANTs für anon-INSERT auf contacts/deals/activity_log. Pure Logic in `src/features/lead-create/leadCreateLogic.ts` (testbar wenn Vitest kommt). Bundle 340→377 KB gzipped. |
-| 5 | PDF-Drag-Drop | ⬜ | — | — | In-Memory-Parsing, Subagent-Extraktion |
+| 5 | PDF-Drag-Drop | ❌ verworfen | 2026-05-12 | 013 | Nicht gebaut. Aufwand-Nutzen ungünstig — Aufteiler-Workflow (Schritt 7) deckt ~95% der Lead-Befüllung ab. Tab "Mit PDF" aus `LeadCreateModal.tsx` entfernt. Reaktivierung später möglich (Cloud ~3h / Lokal ~6h). Siehe ADR-013. |
 | 6 | CRM-Tabelle | ⬜ | — | — | Kontakt-Liste + Chat-Stream |
 | 7 | Aufteiler-Workflow-Integration | ⬜ | — | — | Subagent "CRM Befüllen" via Supabase REST |
 | 8 | Tägliches Mail-Briefing | ⬜ | — | — | Vercel Cron, SMTP, HTML-Template |
@@ -44,7 +44,7 @@ Status pro Bauschritt aus [02_implementierungsplan.md](02_implementierungsplan.m
 
 - [ ] Lead-Liste zeigt alle Excel-Daten
 - [ ] Aufteiler-Workflow schreibt automatisch ins CRM (duplikat-frei)
-- [ ] Manuelles Anlegen funktioniert (Schnell + PDF)
+- [ ] Manuelles Anlegen funktioniert (Schnell-Tab)
 - [ ] CRM-Chat pro Kontakt funktioniert mit Edit/Delete
 - [ ] Tägliche Mail kommt 8:00 mit korrekten Daten
 - [ ] Performance-Tracking zeigt korrekten Wochenvergleich

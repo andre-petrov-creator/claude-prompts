@@ -18,6 +18,21 @@ Pro Schritt: Eigener Web-Claude-Chat für Sparring, dann finaler Claude-Code-Pro
 
 ---
 
+## Kommunikation mit Claude bei Auswahl-Entscheidungen (verbindlich)
+
+Owner ist kein Programmierer. Bei jeder Auswahl-Frage gilt das **4-Punkte-Schema** für jeden Fachbegriff (auch in Code-Schritt-Beschreibungen wenn relevant):
+
+1. **Was es heißt** — kurze Definition in Alltagssprache
+2. **Wozu es gut ist** — welchen Zweck es im System hat
+3. **Wie es funktioniert** — der Mechanismus in 1-2 Sätzen
+4. **Warum wir es (hier) brauchen** — konkreter Bezug zum Tool
+
+Plus: jede Auswahl-Frage **mit klarer Empfehlung** (erste Option, markiert mit "(Empfohlen)") und mit konkreten Folgen (Kosten, Wartezeit, Aufwand, Risiko).
+
+Verankert auch in [DEVELOPMENT_GUIDELINES.md](../DEVELOPMENT_GUIDELINES.md) Abschnitt "Kommunikation mit dem Owner".
+
+---
+
 ## Schritt 0: Projekt-Setup (Phase 2)
 
 **Ziel:** Saubere Projektstruktur mit Memory-Architektur für Claude Code
@@ -127,20 +142,15 @@ Pro Schritt: Eigener Web-Claude-Chat für Sparring, dann finaler Claude-Code-Pro
 
 ---
 
-## Schritt 5: PDF-Drag-Drop für Lead-Anlegen
+## Schritt 5: PDF-Drag-Drop — VERWORFEN
 
-**Ziel:** Tab 2 (Smart-Mode) mit PDF-Extraktion (ohne Speicherung)
+**Status:** ❌ Nicht gebaut. Tab "Mit PDF" aus dem Lead-Anlegen-Modal entfernt.
 
-**Aufgaben:**
-1. Tab 2: Drag & Drop Zone (react-dropzone)
-2. PDF in-memory parsen (kein Upload, kein Storage, PDF wird nach Verarbeitung verworfen)
-3. Subagent-Call (Claude API) für Feld-Extraktion
-4. Extracted Fields in Form-Felder vorbefüllen
-5. User-Verifikation und Korrektur möglich
-6. Optional: User trägt manuell einen lokalen Pfad oder OneDrive-Link in `expose_local_path` ein
-7. Speichern-Logik wie in Schritt 4
+**Begründung:** Aufwand-Nutzen ungünstig — der Aufteiler-Workflow (Schritt 7) deckt ~95% der Lead-Befüllung automatisch ab. Manueller PDF-Drop wäre nur für seltene Off-Market-Sonderfälle relevant (1-5×/Woche), bei denen 1-2 Minuten manuelle Tipparbeit im Schnell-Tab akzeptabel sind.
 
-**Output:** PDF rein, Felder kommen automatisch raus, PDF bleibt lokal auf dem PC.
+**Details:** siehe [ADR-013 in 03_decisions.md](03_decisions.md#adr-013--schritt-5-pdf-drag-drop-nicht-gebaut)
+
+**Reaktivierung später möglich** (Cloud-Variante ~3h oder lokaler Server ~6h, wiederverwendet `automatisierung-aquise/modules/m05_address_extractor.py`) — Entscheidung dann mit echten Nutzungsdaten.
 
 ---
 
@@ -259,16 +269,16 @@ Schritt 1 (DB-Schema)
 Schritt 2 (Lead-Liste read-only)
        │
        ▼
-Schritt 3 (Lead-Interaktionen)  ───┐
-       │                            │
-       ▼                            │
-Schritt 4 (Manueller Lead)          │
-       │                            │
-       ▼                            │
-Schritt 6 (CRM-Tabelle)             │
-       │                            │
-       ▼                            │
-Schritt 5 (PDF-Drag-Drop)  ◄────────┘ (kann parallel zu 3-6)
+Schritt 3 (Lead-Interaktionen)
+       │
+       ▼
+Schritt 4 (Manueller Lead)
+       │
+       ▼
+Schritt 5 (PDF-Drag-Drop) ❌ VERWORFEN — siehe ADR-013
+       │
+       ▼
+Schritt 6 (CRM-Tabelle)
        │
        ▼
 Schritt 7 (Workflow-Integration)
@@ -294,13 +304,13 @@ Schritt 10 (Polish)
 | 2 Lead-Liste read-only | 4 h |
 | 3 Lead-Interaktionen | 4 h |
 | 4 Manueller Lead | 3 h |
-| 5 PDF-Drag-Drop | 3 h |
+| 5 PDF-Drag-Drop | ❌ verworfen (ADR-013) |
 | 6 CRM-Tabelle | 3 h |
 | 7 Workflow-Integration | 3 h |
 | 8 Tages-Mail | 4 h |
 | 9 Daten-Migration | 2 h |
 | 10 Polish | 4 h |
-| **Total** | **~34 h** |
+| **Total** | **~31 h** |
 
 Bei 1-2 Schritten pro Abend: ~2-3 Wochen bis MVP.
 
@@ -310,7 +320,7 @@ Bei 1-2 Schritten pro Abend: ~2-3 Wochen bis MVP.
 
 - [ ] Lead-Liste zeigt alle Excel-Daten
 - [ ] Aufteiler-Workflow schreibt automatisch ins CRM (Duplikat-frei)
-- [ ] Manuelles Anlegen funktioniert (Schnell + PDF)
+- [ ] Manuelles Anlegen funktioniert (Schnell-Tab)
 - [ ] CRM-Chat pro Kontakt funktioniert mit Edit/Delete
 - [ ] Tägliche Mail kommt 8 Uhr mit korrekten Daten
 - [ ] Performance-Tracking zeigt korrekten Wochenvergleich

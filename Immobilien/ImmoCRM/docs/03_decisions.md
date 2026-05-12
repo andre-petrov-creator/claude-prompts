@@ -589,7 +589,51 @@ Schritt 4 baut die manuelle Lead-Anlage als Modal mit Tabs. Mehrere Sub-Entschei
 - **Migration `008_step4_inserts.sql`**: RLS INSERT-Policies + GRANTs für anon auf `contacts`, `deals`, `activity_log`. UPDATE auf contacts war bereits aus Migration 004 vorhanden (`anon_update_contacts`).
 - **Pure Logic in `src/features/lead-create/leadCreateLogic.ts`**: testbar, falls Vitest später kommt — aktuell kein Test-Setup im Repo (GUIDELINES erlaubt das im MVP, kritische Logik ist trotzdem isoliert).
 - **`expose_local_path` aus dem Schnell-Tab raus**: nur `expose_url`. Lokaler Pfad kann via Inline-Edit später ergänzt werden — bzw. kommt erst im PDF-Tab (Schritt 5) sinnvoll rein.
-- **Tab "Mit PDF"**: disabled mit Hover-Hint "Kommt in Schritt 5". UI-Versprechen sichtbar.
+- **Tab "Mit PDF"**: disabled mit Hover-Hint "Kommt in Schritt 5". UI-Versprechen sichtbar. *(Hinweis: Schritt 5 wurde später verworfen, Tab entfernt — siehe ADR-013.)*
 - **Bestehender Inline-Edit-Pfad bleibt der Default für Korrekturen**: Modal ist nur für Neu-Anlage.
 - **Bundle-Wachstum**: ~37 KB gzipped (rhf+zod+radix-tabs/label) — von 340 → 377 KB. Akzeptabel.
 
+---
+
+## ADR-013 — Schritt 5 (PDF-Drag-Drop) nicht gebaut
+
+- **Datum:** 2026-05-12
+- **Status:** Accepted
+- **Schritt:** 5 (verworfen)
+
+### Kontext
+
+Schritt 5 war geplant als Tab 2 "Mit PDF" im Lead-Anlegen-Modal: Owner droppt ein Exposé-PDF, ein KI-Service extrahiert Felder automatisch, Form wird vorbefüllt. Architektur-Diskussion drehte sich um Wege gegen das Vercel-Free-Plan-Payload-Limit von 4,5 MB:
+
+- Vercel-Cloud-Endpoint mit 4,5 MB Hard-Cap (deckt typische 1-3 MB-Exposés)
+- Lokaler Python-Server im `automatisierung-aquise`-Repo (deckt 100% der PDFs, ~6h Bau + Wartung)
+- Hybrid Cloud/Lokal (~+50% Aufwand, zwei Code-Pfade)
+- Browser-Splitting + Multi-Cloud-Calls (Kontext-Verlust, 5× Latenz)
+
+Bau-Schätzung Cloud-Variante: ~3h.
+
+### Entscheidung
+
+Schritt 5 wird **nicht gebaut**. Tab "Mit PDF" aus dem Modal entfernt. Lead-Anlage funktioniert nur noch über den Schnell-Tab (Schritt 4).
+
+UI-Konsequenz: `LeadCreateModal.tsx` rendert `QuickLeadForm` direkt, ohne Tabs-Wrapper.
+
+### Begründung
+
+Aufwand-Nutzen ungünstig im Single-User-MVP:
+
+- **Hauptdatenquelle ist der Aufteiler-Workflow (Schritt 7).** Schätzung: ~95% aller Leads kommen automatisch per PDF→Mail→Aufteiler→CRM. Schritt 5 deckt nur die Rest-1-5× pro Woche Off-Market-Sonderfälle ab.
+- **Bei seltener Nutzung lohnt sich Bau-Aufwand × Wartung × API-Cost nicht.** Selbst die 3h-Cloud-Variante spart pro Lead nur 1-2 Minuten Tipparbeit.
+- **Schritt 4 (Schnell-Tab) ist da und funktioniert.** Off-Market-Leads kommen über den manuellen Pfad rein — etwas mehr Tipparbeit, aber zuverlässig und ohne Sonderfälle.
+- **YAGNI:** Schritt 5 war eine Komfort-Optimierung für einen Use Case, dessen tatsächliche Häufigkeit unklar ist. Erst bauen wenn nachweislich Bedarf.
+
+### Konsequenzen
+
+- **`LeadCreateModal.tsx`**: Tabs raus, `QuickLeadForm` direkt eingebettet. `DialogDescription` angepasst auf "Off-Market schnell erfassen. Automatische Befüllung läuft über den Aufteiler-Workflow."
+- **`02_implementierungsplan.md`**: Schritt 5 als VERWORFEN markiert mit Verweis auf diesen ADR. Build-Reihenfolge: nach Schritt 4 direkt Schritt 6.
+- **`04_progress.md`**: Schritt 5 auf ❌ verworfen, MVP-DoD-Item "Manuelles Anlegen (Schnell + PDF)" wird zu "Manuelles Anlegen (Schnell)".
+- **Nicht entfernt**: `components/ui/tabs.tsx` + `@radix-ui/react-tabs` — generische UI-Komponente, evtl. später nützlich. Kein eigenes Refactor nötig.
+- **Reaktivierungs-Pfad** (falls Bedarf später bestätigt wird):
+  - Cloud-Variante: ~3h Bau, 4,5 MB Limit + Toast bei Übergröße
+  - Lokal-Variante: ~6h Bau, ohne Größenlimit, wiederverwendet `automatisierung-aquise/modules/m05_address_extractor.py`
+  - Entscheidung dann mit echten Nutzungsdaten ("wie oft droppe ich PDFs wirklich?")

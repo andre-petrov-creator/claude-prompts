@@ -15,6 +15,23 @@ Coding-Standards, Naming, Patterns. Gilt für alle Implementierungs-Schritte.
 
 ---
 
+## Kommunikation mit dem Owner (verbindlich)
+
+Owner ist kein Programmierer. Bei jeder Frage / jeder Auswahl-Entscheidung gilt:
+
+1. **Einfache Worte** statt Fachbegriffe.
+2. **Bei jedem unvermeidbaren Fachbegriff** (z.B. "Edge Runtime", "Payload-Limit", "CORS") **immer das 4-Punkte-Schema:**
+   - **Was es heißt** — kurze Definition in Alltagssprache
+   - **Wozu es gut ist** — welchen Zweck es im System hat
+   - **Wie es funktioniert** — der Mechanismus, in 1-2 Sätzen
+   - **Warum wir es (an dieser Stelle) brauchen** — der konkrete Bezug zu unserem Tool
+3. **Konkrete Zahlen statt abstrakter Eigenschaften.** "Du wartest 10 Sekunden statt 6" — nicht "geringere Latenz".
+4. **Immer eine klare Empfehlung** mit kurzer Begründung. Die empfohlene Option steht zuerst und ist mit "(Empfohlen)" markiert.
+5. **Folgen der Wahl** sichtbar machen: was kostet sie, was bringt sie, was sind die Risiken.
+6. Wenn der Owner sagt "ich verstehe nicht": neu erklären, nicht dieselben Begriffe wiederholen — das 4-Punkte-Schema strikt anwenden.
+
+---
+
 ## Datei-Struktur (`src/`)
 
 ```
