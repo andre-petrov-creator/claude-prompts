@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import type { Database } from "@/types/supabase"
+import type { ContactStatus } from "@/types/domain"
 
 type ContactUpdate = Database["public"]["Tables"]["contacts"]["Update"]
 
@@ -12,13 +13,16 @@ export type EditableContactField =
   | "email"
   | "lead_source"
   | "position"
+  | "status"
+
+type FieldValue = string | ContactStatus | null
 
 export const useUpdateContactField = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: {
       contactId: string
-      patch: Partial<Record<EditableContactField, string | null>>
+      patch: Partial<Record<EditableContactField, FieldValue>>
       successMessage?: string
     }) => {
       const { error } = await supabase
@@ -30,6 +34,7 @@ export const useUpdateContactField = () => {
     },
     onSuccess: (args) => {
       qc.invalidateQueries({ queryKey: ["deals", "with-followup"] })
+      qc.invalidateQueries({ queryKey: ["contacts", "aggregated"] })
       if (args.successMessage) toast.success(args.successMessage)
     },
     onError: (err) => toast.error(`Fehler: ${err.message}`),

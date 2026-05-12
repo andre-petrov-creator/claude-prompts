@@ -1,4 +1,4 @@
-import type { DealStatus } from "@/types/domain"
+import type { DealStatus, ContactStatus } from "@/types/domain"
 
 export const STATUS_LABELS: Record<DealStatus, string> = {
   offen: "Offen",
@@ -13,6 +13,27 @@ export const STATUS_COLORS: Record<DealStatus, string> = {
 }
 
 export const SECTION_ORDER: DealStatus[] = ["berechnet", "offen", "absage"]
+
+export const CONTACT_STATUS_LABELS: Record<ContactStatus, string> = {
+  kalt: "Kalt",
+  warm: "Warm",
+  heiß: "Heiß",
+  nr1: "Nr. 1",
+}
+
+export const CONTACT_STATUS_COLORS: Record<ContactStatus, string> = {
+  kalt: "bg-zinc-100 text-zinc-700 border-zinc-200",
+  warm: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  heiß: "bg-orange-100 text-orange-800 border-orange-200",
+  nr1: "bg-red-100 text-red-800 border-red-200",
+}
+
+export const CONTACT_STATUS_OPTIONS: { value: ContactStatus; label: string }[] = [
+  { value: "kalt", label: "Kalt" },
+  { value: "warm", label: "Warm" },
+  { value: "heiß", label: "Heiß" },
+  { value: "nr1", label: "Nr. 1" },
+]
 
 export const OBJECT_TYPE_DEFAULTS = ["MFH", "ETW", "REH", "EFH", "DHH", "Bungalow"]
 export const VERWENDUNG_DEFAULTS = ["B&H", "F&F"]

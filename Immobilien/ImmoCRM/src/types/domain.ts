@@ -16,3 +16,9 @@ export type LeadRow = DealWithFollowup & {
   >
   notes_count: number
 }
+
+export type ContactRow = Contact & {
+  last_contact: string | null
+  deals_count: number
+  comments_count: number
+}

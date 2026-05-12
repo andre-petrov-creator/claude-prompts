@@ -5,22 +5,31 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, X, Filter as FilterIcon } from "lucide-react"
 import type { LeadRow, DealStatus } from "@/types/domain"
 import { SECTION_ORDER, STATUS_LABELS } from "@/lib/constants"
 import LeadFilters from "./LeadFilters"
 import LeadCreateModal from "@/features/lead-create/LeadCreateModal"
 
+type ContactFilter = {
+  id: string
+  name: string | null
+  matchCount: number
+  onClear: () => void
+}
+
 type Props = {
   table: Table<LeadRow>
   globalFilter: string
   setGlobalFilter: (v: string) => void
+  contactFilter: ContactFilter | null
 }
 
 export default function LeadSections({
   table,
   globalFilter,
   setGlobalFilter,
+  contactFilter,
 }: Props) {
   const rowsByStatus: Record<DealStatus, Row<LeadRow>[]> = {
     offen: [],
@@ -69,6 +78,24 @@ export default function LeadSections({
           <LeadCreateModal />
         </div>
       </div>
+
+      {contactFilter && (
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded text-sm text-blue-900">
+          <FilterIcon className="w-3.5 h-3.5" />
+          <span>
+            Gefiltert: <span className="font-medium">{contactFilter.name ?? "Makler"}</span>{" "}
+            ({contactFilter.matchCount})
+          </span>
+          <button
+            onClick={contactFilter.onClear}
+            className="ml-1 p-0.5 rounded hover:bg-blue-100"
+            aria-label="Filter entfernen"
+            title="Filter entfernen"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {SECTION_ORDER.map((status) => (
         <Collapsible

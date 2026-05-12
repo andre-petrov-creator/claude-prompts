@@ -595,6 +595,82 @@ Schritt 4 baut die manuelle Lead-Anlage als Modal mit Tabs. Mehrere Sub-Entschei
 
 ---
 
+## ADR-014 — Kontakt-Aggregation clientseitig statt SQL-View
+
+- **Datum:** 2026-05-12
+- **Status:** Accepted
+- **Schritt:** 6 (CRM-Tabelle)
+
+### Kontext
+
+CRM-Tabelle braucht pro Kontakt: `last_contact` (MAX aus `letzter_anruf` aller Deals und `created_at` aller Comments), `deals_count`, `comments_count`. Drei Optionen:
+
+(a) SQL-View `contacts_aggregated` mit Subqueries — schöne Single-Source-of-Truth, aber Migration nötig + View-RLS-Setup
+(b) Clientseitige Aggregation via drei `Promise.all`-Queries + Maps (analog `useDeals` aus Schritt 2)
+(c) Stored Function — overkill für read-only Aggregation
+
+### Entscheidung
+
+**(b) Clientseitige Aggregation** in `src/hooks/useContacts.ts`.
+
+```ts
+const [contactsRes, dealsRes, commentsRes] = await Promise.all([
+  supabase.from("contacts").select("*").is("deleted_at", null),
+  supabase.from("deals").select("contact_id, letzter_anruf").is("deleted_at", null),
+  supabase.from("contact_comments").select("contact_id, created_at"),
+])
+// Maps für counts + MAX-Aggregation
+```
+
+### Begründung
+
+- **Konsistenz** mit `useDeals` (Schritt 2) — gleiches Pattern, gleiche Fehlerbehandlung, gleiche Cache-Strategie
+- **Datenmengen unkritisch**: bei ~80 Kontakten + paar hundert Deals + paar hundert Comments sind das <1k Zeilen Network-Payload, sub-100ms RTT auf Free-Tier
+- **Kein Migrations-Overhead** — keine View-RLS-Frage (ADR-008 macht View-RLS via `security_invoker`, jeder weitere View-Bau zwingt zur erneuten RLS-Entscheidung)
+- **Reversibel**: bei 1k+ Kontakten kann später eine MView eingeführt werden, Hook-Interface bleibt gleich
+
+**Verworfen:**
+- (a) View: bei aktueller Datenmenge YAGNI; jede neue View frisst eine RLS-Iteration
+- (c) Stored Function: nicht reaktiv invalidierbar via react-query — Hook-Schnittstelle wird komplexer
+
+### Konsequenzen
+
+- `useContacts.ts` macht 3 parallele Selects, aggregiert in Maps, returnt `ContactRow[]`
+- Query-Key: `["contacts", "aggregated"]` — invalidiert bei jeder Contact-/Comment-Mutation
+- `useUpdateContactField` invalidiert jetzt zusätzlich diesen Key (statt nur `["deals", "with-followup"]`)
+- Wenn Performance bei Skalierung leidet (>1k Kontakte): MView `contacts_aggregated` einführen, `useContacts` selektiert daraus — Hook-Konsumer bleiben unverändert
+
+---
+
+## ADR-015 — Chat-Eingabe: Plain `<textarea>` statt Tiptap
+
+- **Datum:** 2026-05-12
+- **Status:** Accepted
+- **Schritt:** 6 (CRM-Tabelle, Chat-Stream)
+
+### Kontext
+
+Pro Kontakt gibt es einen WhatsApp-Style-Chat-Stream (`contact_comments`). Deal-Notes nutzen aus Schritt 3 Tiptap (Rich-Text, Bold/Italic/Listen). Die naive Wiederverwendung wäre Tiptap auch für Chat — aber Chat braucht Enter-To-Send + Shift+Enter-Zeilenumbruch + sehr schnelle Eingabe.
+
+### Entscheidung
+
+**Plain `<textarea>`** für Eingabe + plain text (`contact_comments.text`) für Storage. Edit-Komponente nutzt ebenfalls `<textarea>` mit Enter-To-Save / Escape-To-Cancel.
+
+### Begründung
+
+- **Chat-UX**: Enter-To-Send ist Standard (WhatsApp, Slack, iMessage). Tiptap fängt Enter für `hardBreak`/`listItem` ab — würde aufwendige Keymap-Override brauchen
+- **Datenmodell-Schema**: `contact_comments.text TEXT` (kein `content_html`) — Chat-Einträge sind Quick-Notes, keine formatierten Dokumente. Rich-Text-Markup im Plain-Text-Feld wäre unsauber
+- **Bundle**: Tiptap-Editor-Instanz pro Item beim Edit-Mode = teuer; Textarea = 0 zusätzliche Dependencies
+- **Lesbarkeit**: `whitespace-pre-wrap` reicht für Zeilenumbrüche — User schreibt 1-3 Sätze, kein Markdown nötig
+
+### Konsequenzen
+
+- `ChatInput.tsx`: `<textarea>` mit `onKeyDown`-Logik (Enter ohne Shift → send, Shift+Enter → newline)
+- `ContactChatItem.tsx`: Display via `whitespace-pre-wrap`, Edit via `<textarea>` mit Enter/Escape
+- Wenn jemals Rich-Text-Bedarf im Chat: separate Migration `content_html` + Editor-Switch — aber dann reden wir über ein anderes Produkt
+
+---
+
 ## ADR-013 — Schritt 5 (PDF-Drag-Drop) nicht gebaut
 
 - **Datum:** 2026-05-12

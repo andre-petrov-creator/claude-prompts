@@ -77,7 +77,20 @@ const saveJson = (key: string, value: unknown) => {
   }
 }
 
-export default function LeadTable({ data }: { data: LeadRow[] }) {
+type ContactFilter = {
+  id: string
+  name: string | null
+  matchCount: number
+  onClear: () => void
+}
+
+export default function LeadTable({
+  data,
+  contactFilter,
+}: {
+  data: LeadRow[]
+  contactFilter?: ContactFilter | null
+}) {
   const [sorting, setSorting] = useState<SortingState>(() =>
     loadJson(STORAGE_KEYS.sorting, [] as SortingState),
   )
@@ -526,6 +539,7 @@ export default function LeadTable({ data }: { data: LeadRow[] }) {
         table={table}
         globalFilter={globalFilter}
         setGlobalFilter={setGlobalFilter}
+        contactFilter={contactFilter ?? null}
       />
       <DealNotesPanel
         dealId={panelDealId}
