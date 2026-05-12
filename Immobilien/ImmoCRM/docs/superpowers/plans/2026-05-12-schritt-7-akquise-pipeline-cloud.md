@@ -2,18 +2,21 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Cloud-Pipeline baut, die Mails aus Outlook-Ordner "CRM-Eingang" alle 5 Min abholt, PDFs in OneDrive ablegt, einen QuickCheck-Score samt Begründung erzeugt, das Objekt als Pre-Screening-Lead ins CRM schreibt, einen Doppelklick-Workspace im Ordner ablegt (öffnet VS Code + Claude Code mit vollem QuickCheck-Kontext) und das Daily-Briefing um eine Pre-Screening-Sektion erweitert.
+**Goal:** Cloud-Pipeline baut, die Mails aus dem M365-Ordner "CRM-Eingang" in Echtzeit via Microsoft-Graph-Webhook empfängt, PDFs in OneDrive ablegt, einen QuickCheck-Score samt Begründung erzeugt, das Objekt als Pre-Screening-Lead ins CRM schreibt, einen Doppelklick-Workspace im Ordner ablegt (öffnet VS Code + Claude Code mit vollem QuickCheck-Kontext) und das Daily-Briefing um eine Pre-Screening-Sektion erweitert.
 
 **Architektur:**
 - Vercel Edge Function (TypeScript) auf bestehendem ImmoCRM-Vercel-Projekt
-- cron-job.org alle 5 Min → `/api/cron/akquise-poll` (IMAP-Poll, Enqueue) → fire-and-forget `/api/akquise/process` (Stage-Worker pro Mail)
+- web.de leitet Akquise-Mails automatisch an `appv@appv7878.onmicrosoft.com` weiter → Outlook-Regel verschiebt nach Ordner `CRM-Eingang`
+- Microsoft-Graph-Subscription auf `CRM-Eingang` → Echtzeit-POST an `/api/akquise/webhook` → fire-and-forget `/api/akquise/process` (Stage-Worker pro Mail)
+- Subscription-Renewal täglich via Vercel-Cron (`/api/cron/renew-subscription`)
 - Idempotenz via `mail_queue.message_id` PRIMARY KEY
 - Aufteiler-Workflow bleibt **unverändert** — nur das CRM bekommt Pre-Screening-Status
 
-**Tech-Stack:** TypeScript · `imapflow` · `@microsoft/microsoft-graph-client` + `@azure/msal-node` · `pdf-parse` · `@anthropic-ai/sdk` · Supabase REST · Vercel Edge Runtime
+**Tech-Stack:** TypeScript · `@microsoft/microsoft-graph-client` + `@azure/msal-node` · `pdf-parse` · `@anthropic-ai/sdk` · Supabase REST · Vercel Edge Runtime
 
 **Quellen:**
 - Spec: `docs/superpowers/specs/2026-05-11-akquise-pipeline-cloud-design.md`
+- **Hinweis 2026-05-12:** Spec 2026-05-11 beschrieb IMAP-Polling auf web.de. Plan wurde am 2026-05-12 auf Microsoft Graph Webhook umgestellt (Mailbox `appv@appv7878.onmicrosoft.com`, web.de leitet weiter). Siehe ADR-021.
 - Übernommene Heuristiken aus altem Schritt-7-Prompt: Position-Erkennung (GF/Inhaber/Makler), Soft-Match-Warn-Comment, fail-safe-CRM-Schreibfehler
 - Workspace-Mechanik: `.code-workspace` + `tasks.runOn:folderOpen` + Ordner-`CLAUDE.md` + `00_briefing.md` (kein echtes Claude-Code-Resume — gleiche Funktion, einfacher)
 
@@ -27,18 +30,19 @@
 app/                                                  (NEUE TOP-LEVEL — bisher Vite-SPA ohne app/-Folder)
 └── api/
     ├── cron/
-    │   └── akquise-poll/route.ts                     Poll-Endpoint, dünn
+    │   └── renew-subscription/route.ts               Täglicher Cron: Graph-Subscription erneuern
     └── akquise/
+        ├── webhook/route.ts                          Empfängt Graph-Notifications (POST + Validation-GET)
         ├── process/route.ts                          Stage-Worker pro Mail
         └── _lib/
-            ├── imapClient.ts                         IMAP-Verbindung web.de
-            ├── parseEmail.ts                         MIME → PDF-Buffer + Links + Mailtext
+            ├── fetchMail.ts                          Lädt Mail + Attachments via Graph API
+            ├── parseEmail.ts                         Graph-Mail-JSON → PDF-Buffer + Links + Mailtext
             ├── resolveLink.ts                        Online-Link → PDF-Buffer
             ├── classifyPdf.ts                        Filename + Inhalt → typ
             ├── extractAddress.ts                     Regex + Anthropic-Fallback
             ├── extractContact.ts                     Name + Email + Firma + Position
             ├── uploadOneDrive.ts                     Microsoft Graph
-            ├── msGraphClient.ts                      MSAL-Auth + Refresh-Token-Handling
+            ├── msGraphClient.ts                      MSAL-Auth + Refresh-Token-Handling (OneDrive + Mail.Read)
             ├── writeWorkspace.ts                     .code-workspace + CLAUDE.md + 00_briefing.md
             ├── quickCheck.ts                         Score-Stub (Logik kommt von Modul-0-Überarbeitung)
             ├── insertLead.ts                         Supabase: contact + deal + activity_log
@@ -78,6 +82,8 @@ vercel.json                                           Edge-Function-Config (fall
 ## Vor-Schritt (Spike) — BLOCKIEREND
 
 ### Task S1: 30-Min-Spike — web.de + OneDrive Vorab-Check
+
+> **Hinweis 2026-05-12:** S1 ist historisch (ursprünglich IMAP-Variante-A-Validierung). Mit dem Refactor auf Microsoft Graph Webhook (ADR-021) ist der IMAP-Teil dieses Spikes obsolet — das OneDrive-Bootstrapping (Steps 5-6) bleibt aber relevant und wird im Refactor durch das erweiterte msGraphClient-Smoke-Test in Task 7c-Step-4 mitabgedeckt. Falls Spike noch nicht ausgeführt wurde: direkt zu Task S2 + Task 7c springen.
 
 **Files:**
 - Create: `scripts/spike-imap-onedrive.mjs` (lokales Test-Skript, wird **nicht** committed — `.gitignore` deckt scripts-Spike ab via expliziter Regel)
@@ -161,8 +167,49 @@ In `docs/04_progress.md` notieren: S1 ✅ am <Datum>, web.de App-Passwörter ver
 
 - [ ] **Step 7: GO/NO-GO Entscheidung**
 
-Bei GO: weiter zu Task 7a.
+Bei GO: weiter zu Task S2.
 Bei NO-GO (web.de blockiert IMAP-Apps): STOPP, separate Brainstorming-Session für Variante B.
+
+---
+
+### Task S2: web.de → M365 Auto-Forward + Outlook-Regel einrichten (manuell, blockierend)
+
+**Files:** keine — manuelle Konfiguration in web.de Webmail + Outlook
+
+**Ziel:** Akquise-Mails landen physisch im M365-Postfach im Ordner `CRM-Eingang`, damit Microsoft-Graph-Webhook abonniert werden kann.
+
+- [ ] **Step 1: web.de Auto-Forward konfigurieren**
+
+In https://web.de einloggen → Einstellungen → E-Mail → Filterregeln (oder "Weiterleitung") → Neue Regel:
+- Bedingung: "Alle eingehenden Mails"
+- Aktion: "Weiterleiten an `appv@appv7878.onmicrosoft.com`"
+- Option: "Kopie im web.de-Posteingang behalten" AKTIVIEREN (so dass web.de auch noch die Mail hat)
+
+- [ ] **Step 2: M365-Ordner `CRM-Eingang` anlegen**
+
+In Outlook (Desktop oder web.outlook.com) im M365-Postfach `appv@appv7878.onmicrosoft.com`:
+Rechtsklick auf Posteingang → "Neuer Ordner" → Name `CRM-Eingang` → Enter
+
+- [ ] **Step 3: Outlook-Regel anlegen**
+
+In Outlook → Regeln → Neue Regel:
+- Bedingung: "From-Adresse enthält `andre-petrov@web.de`"
+- Aktion: "Verschieben in Ordner CRM-Eingang"
+- Aktion: "Als gelesen markieren" NICHT aktivieren (Pipeline filtert per Idempotenz, nicht per Gelesen-Status)
+
+- [ ] **Step 4: Test-Mail**
+
+Test-Mail an `andre-petrov@web.de` schicken (z.B. von einer anderen Adresse). Innerhalb von 30s sollte sie in M365 → CRM-Eingang erscheinen.
+
+Wenn nicht: web.de-Forward-Regel + Outlook-Regel-Bedingungen debuggen.
+
+- [ ] **Step 5: Tenant-ID + Mailbox-ID notieren**
+
+Für spätere Verwendung in Task 7c:
+- Tenant-ID: aus entra.microsoft.com → Übersicht → Verzeichnis-ID
+- Mailbox-Email: `appv@appv7878.onmicrosoft.com`
+
+Akzeptanz: Mail an web.de landet via Forward + Outlook-Regel innerhalb 30s in M365-Ordner CRM-Eingang.
 
 ---
 
@@ -203,15 +250,14 @@ $$;
 -- Idempotenz-Tabelle für Pipeline
 
 CREATE TABLE mail_queue (
-  message_id      text PRIMARY KEY,
-  imap_uid        integer NOT NULL,
-  status          text NOT NULL CHECK (status IN ('pending', 'processing', 'done', 'error')),
-  enqueued_at     timestamptz NOT NULL DEFAULT now(),
-  started_at      timestamptz,
-  done_at         timestamptz,
-  error_msg       text,
-  deal_id         uuid REFERENCES deals(id) ON DELETE SET NULL,
-  raw_source_sha  text
+  message_id        text PRIMARY KEY,
+  graph_message_id  text,
+  status            text NOT NULL CHECK (status IN ('pending', 'processing', 'done', 'error')),
+  enqueued_at       timestamptz NOT NULL DEFAULT now(),
+  started_at        timestamptz,
+  done_at           timestamptz,
+  error_msg         text,
+  deal_id           uuid REFERENCES deals(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_mail_queue_status ON mail_queue(status);
@@ -305,9 +351,11 @@ git commit -m "feat(db): pre_screened status, mail_queue, priority_score für ak
 
 Run:
 ```powershell
-npm install imapflow @microsoft/microsoft-graph-client @azure/msal-node pdf-parse @anthropic-ai/sdk mailparser
+npm install @microsoft/microsoft-graph-client @azure/msal-node pdf-parse @anthropic-ai/sdk mailparser
 npm install -D @types/mailparser
 ```
+
+(`mailparser` bleibt als Toolbox-Dep für etwaige eml-Spezialfälle, primäres Mail-Parsing läuft aber über Graph-JSON in Task 7e.)
 
 Expected: Installation läuft durch, `package.json` enthält die neuen Deps.
 
@@ -320,19 +368,16 @@ In `.env.example` am Ende anfügen:
 # Akquise-Pipeline (Schritt 7) — nur in Vercel-Env, nicht lokal nötig
 # ============================================================
 
-# web.de IMAP-Zugriff
-WEBDE_IMAP_USER=andre-petrov@web.de
-WEBDE_IMAP_APP_PASSWORD=  # App-Passwort aus web.de-Sicherheits-Einstellungen
+# Microsoft Graph Webhook-Validation (clientState für Graph-Subscription, ersetzt CRON_SECRET_AKQUISE)
+MS_GRAPH_WEBHOOK_CLIENT_STATE=  # zufälliger String, wird beim Subscription-Erstellen mitgegeben und mit jedem Webhook-Push zurückgesendet
 
-# Cron-Trigger-Authentication (cron-job.org sendet Bearer-Token)
-CRON_SECRET_AKQUISE=  # zufälliger String, in cron-job.org als Header setzen
-
-# Microsoft Graph (OneDrive-Upload)
+# Microsoft Graph (OneDrive-Upload + Mail-Read)
 MS_GRAPH_CLIENT_ID=
 MS_GRAPH_CLIENT_SECRET=
-MS_GRAPH_TENANT_ID=common  # oder spezifische Tenant-ID bei Geschäftskonto
+MS_GRAPH_TENANT_ID=  # spezifische Tenant-ID aus entra.microsoft.com (NICHT 'common', wir sind Single-Tenant)
 MS_GRAPH_REFRESH_TOKEN=  # einmalig per OAuth-Flow geholt, danach automatisch verlängert
 MS_GRAPH_USER_EMAIL=andre-petrov@example.com  # OneDrive-Owner
+MS_GRAPH_MAILBOX_EMAIL=appv@appv7878.onmicrosoft.com  # M365-Postfach, auf dessen CRM-Eingang-Ordner Subscription läuft
 
 # OneDrive-Pfad-Konfiguration
 ONEDRIVE_BASE_PATH=/Immobilien/001_AQUISE/Objekte
@@ -353,18 +398,23 @@ Lese erst `vercel.json` falls existiert. Wenn nicht: anlegen mit:
 ```json
 {
   "functions": {
-    "app/api/cron/akquise-poll/route.ts": {
-      "maxDuration": 60
+    "app/api/akquise/webhook/route.ts": {
+      "maxDuration": 30
     },
     "app/api/akquise/process/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/cron/renew-subscription/route.ts": {
+      "maxDuration": 30
     }
   },
-  "crons": []
+  "crons": [
+    { "path": "/api/cron/renew-subscription", "schedule": "0 6 * * *" }
+  ]
 }
 ```
 
-(Cron läuft via cron-job.org extern, nicht Vercel-Cron — daher leeres `crons`-Array)
+(Vercel-internen Cron für Subscription-Renewal täglich 6 Uhr UTC = 7 Uhr Berlin-Zeit; Push-Eingang läuft via Microsoft-Graph-Webhook, kein externer Cron-Provider nötig.)
 
 - [ ] **Step 4: CLAUDE.md ergänzen — Pipeline-Hinweis**
 
@@ -377,7 +427,7 @@ Bestehender Cloud-Code-Workflow `Automation Akquise` wird um Subagent **"CRM Bef
 
 NEU:
 ```
-**Akquise-Pipeline (Schritt 7, Cloud):** Mails aus Outlook-Ordner `CRM-Eingang` werden alle 5 Min via Vercel-Edge-Function abgeholt, PDFs nach OneDrive hochgeladen, QuickCheck-Score erzeugt und als Lead mit Status `pre_screened` im CRM angelegt. Aufteiler bleibt unberührt — manueller Trigger via "Ordner-Pfad-kopieren"-Button im CRM. Details: `docs/superpowers/specs/2026-05-11-akquise-pipeline-cloud-design.md`.
+**Akquise-Pipeline (Schritt 7, Cloud):** Mails aus M365-Ordner `CRM-Eingang` (Postfach `appv@appv7878.onmicrosoft.com`, gespeist via web.de-Auto-Forward + Outlook-Regel) werden in Echtzeit via Microsoft-Graph-Webhook empfangen, PDFs nach OneDrive hochgeladen, QuickCheck-Score erzeugt und als Lead mit Status `pre_screened` im CRM angelegt. Aufteiler bleibt unberührt — manueller Trigger via "Ordner-Pfad-kopieren"-Button im CRM. Details: `docs/superpowers/specs/2026-05-11-akquise-pipeline-cloud-design.md`, ADR-021.
 ```
 
 - [ ] **Step 5: Commit**
@@ -389,7 +439,7 @@ git commit -m "chore(akquise): deps + env-vars für pipeline"
 
 ---
 
-## Task 7c: MS-Graph-Auth + OneDrive-Helper
+## Task 7c: MS-Graph-Auth + OneDrive-Helper + Mail-Read
 
 **Files:**
 - Create: `app/api/akquise/_lib/msGraphClient.ts`
@@ -404,16 +454,18 @@ Lokales One-Time-Script `scripts/oauth-bootstrap.mjs`:
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import readline from 'readline';
 
+const SCOPES = ['Files.ReadWrite.All', 'Mail.Read', 'offline_access', 'User.Read'];
+
 const app = new ConfidentialClientApplication({
   auth: {
     clientId: process.env.MS_GRAPH_CLIENT_ID,
     clientSecret: process.env.MS_GRAPH_CLIENT_SECRET,
-    authority: `https://login.microsoftonline.com/${process.env.MS_GRAPH_TENANT_ID || 'common'}`,
+    authority: `https://login.microsoftonline.com/${process.env.MS_GRAPH_TENANT_ID}`,
   },
 });
 
 const url = await app.getAuthCodeUrl({
-  scopes: ['Files.ReadWrite.All', 'offline_access', 'User.Read'],
+  scopes: SCOPES,
   redirectUri: 'http://localhost:3000/auth/callback',
 });
 console.log('Öffne im Browser:\n', url);
@@ -422,7 +474,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 rl.question('Code aus URL nach Redirect: ', async (code) => {
   const token = await app.acquireTokenByCode({
     code,
-    scopes: ['Files.ReadWrite.All', 'offline_access'],
+    scopes: SCOPES,
     redirectUri: 'http://localhost:3000/auth/callback',
   });
   console.log('Refresh-Token (in Vercel als MS_GRAPH_REFRESH_TOKEN setzen):');
@@ -433,6 +485,11 @@ rl.question('Code aus URL nach Redirect: ', async (code) => {
 });
 ```
 
+**Wichtig:**
+- Authority MUSS auf den spezifischen Tenant lauten (`https://login.microsoftonline.com/<TENANT_ID>`, NICHT `common`), weil wir Single-Tenant-App machen
+- Redirect-URI bleibt `http://localhost:3000/auth/callback`
+- `Mail.Read` deckt das Lesen einzelner Mails + Subscription-Bezug auf Mailfolder ab (für Mail-Body + Attachments)
+
 Run einmal lokal, Refresh-Token aus Cache-Output extrahieren, in Vercel-Env-Group als `MS_GRAPH_REFRESH_TOKEN` setzen. Script danach wegwerfen.
 
 - [ ] **Step 2: msGraphClient.ts — Token-Refresh-Wrapper**
@@ -441,6 +498,9 @@ Run einmal lokal, Refresh-Token aus Cache-Output extrahieren, in Vercel-Env-Grou
 // app/api/akquise/_lib/msGraphClient.ts
 import { Client } from '@microsoft/microsoft-graph-client';
 import { ConfidentialClientApplication } from '@azure/msal-node';
+
+// Zentrale Scope-Definition — OneDrive-Upload + Mail-Read teilen sich denselben Token
+export const GRAPH_SCOPES = ['Files.ReadWrite.All', 'Mail.Read', 'offline_access'];
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
@@ -453,13 +513,13 @@ async function getAccessToken(): Promise<string> {
     auth: {
       clientId: process.env.MS_GRAPH_CLIENT_ID!,
       clientSecret: process.env.MS_GRAPH_CLIENT_SECRET!,
-      authority: `https://login.microsoftonline.com/${process.env.MS_GRAPH_TENANT_ID || 'common'}`,
+      authority: `https://login.microsoftonline.com/${process.env.MS_GRAPH_TENANT_ID}`,
     },
   });
 
   const result = await app.acquireTokenByRefreshToken({
     refreshToken: process.env.MS_GRAPH_REFRESH_TOKEN!,
-    scopes: ['Files.ReadWrite.All', 'offline_access'],
+    scopes: GRAPH_SCOPES,
   });
 
   if (!result?.accessToken) {
@@ -561,14 +621,22 @@ Lokales Test-Script `scripts/test-onedrive-upload.mjs` (NICHT committen):
 
 ```javascript
 import { uploadFiles } from '../app/api/akquise/_lib/uploadOneDrive.ts';
+import { graphClient } from '../app/api/akquise/_lib/msGraphClient.ts';
 
+// OneDrive-Upload-Probe
 const result = await uploadFiles({
   addressFolder: '_PIPELINE-SPIKE-' + Date.now(),
   files: [
     { name: 'hello.txt', buffer: Buffer.from('hi'), contentType: 'text/plain' },
   ],
 });
-console.log(result);
+console.log('OneDrive:', result);
+
+// Mail-Read-Probe: bestätigt, dass der gleiche Token auch Mail.Read kann
+const client = await graphClient();
+const mailbox = process.env.MS_GRAPH_MAILBOX_EMAIL;
+const messages = await client.api(`/users/${mailbox}/messages?$top=1`).get();
+console.log('Mail-Probe (eine Mail-ID erwartet):', messages.value?.[0]?.id);
 ```
 
 Run:
@@ -578,7 +646,9 @@ node --experimental-vm-modules --import tsx scripts/test-onedrive-upload.mjs
 
 (Falls tsx nicht installiert: `npm install -D tsx`)
 
-Expected: Ordner `_PIPELINE-SPIKE-<timestamp>` erscheint im OneDrive, `hello.txt` ist drin, `localPath` zeigt einen Windows-Pfad, der sich per Explorer öffnen lässt.
+Expected:
+- Ordner `_PIPELINE-SPIKE-<timestamp>` erscheint im OneDrive, `hello.txt` ist drin, `localPath` zeigt einen Windows-Pfad, der sich per Explorer öffnen lässt.
+- Mail-Probe gibt eine Mail-ID (`AAMkAG...`) aus → bestätigt Mail.Read-Scope auf der Mailbox.
 
 - [ ] **Step 5: Test-Spike wegwerfen**
 
@@ -595,12 +665,21 @@ git commit -m "feat(akquise): ms-graph auth + onedrive upload"
 
 ---
 
-## Task 7d: IMAP-Client + Poll-Endpoint
+## Task 7d: Graph-Webhook-Endpoint + Subscription-Renewal
 
 **Files:**
-- Create: `app/api/akquise/_lib/imapClient.ts`
-- Create: `app/api/cron/akquise-poll/route.ts`
-- Modify: `src/lib/supabaseAdmin.ts` (NEU — Service-Role-Client für Backend)
+- Create: `app/api/akquise/webhook/route.ts`            ← Empfängt Graph-Notifications
+- Create: `app/api/akquise/_lib/fetchMail.ts`           ← Lädt eine Mail per Graph API
+- Create: `app/api/cron/renew-subscription/route.ts`    ← Vercel-Cron: täglich Subscription erneuern
+- Modify: `src/lib/supabaseAdmin.ts` (NEU)
+
+### Wie Microsoft Graph Webhooks funktionieren (Kurz-Briefing)
+
+1. Wir registrieren EINMALIG eine "Subscription" via Graph API: "Sag mir Bescheid wenn eine neue Mail im Ordner CRM-Eingang von Mailbox X kommt, schick die Benachrichtigung an URL Y"
+2. Graph schickt POST an unsere Webhook-URL mit JSON wie:
+   `{ "value": [{ "subscriptionId": "...", "changeType": "created", "resource": "users/.../messages/AAMkAG...", "resourceData": { "id": "AAMkAG..." } }] }`
+3. **WICHTIG: Validation-Request beim Erstellen.** Bei Subscription-Anlage schickt Graph einmal einen GET mit `validationToken`-Query-Param. Endpoint muss diesen Token als Plain-Text mit 200 zurückgeben innerhalb 10s.
+4. Subscription läuft max. 3 Tage für `/me/messages`, danach muss sie via PATCH erneuert werden. Daher der Renewal-Cron.
 
 - [ ] **Step 1: supabaseAdmin.ts**
 
@@ -618,136 +697,183 @@ export function supabaseAdmin() {
 }
 ```
 
-- [ ] **Step 2: imapClient.ts**
+- [ ] **Step 2: fetchMail.ts**
 
 ```typescript
-// app/api/akquise/_lib/imapClient.ts
-import { ImapFlow } from 'imapflow';
+// app/api/akquise/_lib/fetchMail.ts
+import { graphClient } from './msGraphClient';
 
-export async function imapConnect(): Promise<ImapFlow> {
-  const client = new ImapFlow({
-    host: 'imap.web.de',
-    port: 993,
-    secure: true,
-    auth: {
-      user: process.env.WEBDE_IMAP_USER!,
-      pass: process.env.WEBDE_IMAP_APP_PASSWORD!,
-    },
-    logger: false,
-  });
-  await client.connect();
-  return client;
+export interface GraphMail {
+  id: string;
+  internetMessageId: string;
+  subject: string;
+  from: { emailAddress: { name: string; address: string } };
+  toRecipients: Array<{ emailAddress: { name?: string; address: string } }>;
+  receivedDateTime: string;
+  body: { contentType: 'html' | 'text'; content: string };
+  hasAttachments: boolean;
+  inReplyTo?: string;
+}
+
+export interface GraphAttachment {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  contentBytes: string; // base64
+}
+
+export async function fetchMail(mailboxEmail: string, messageId: string): Promise<GraphMail> {
+  const client = await graphClient();
+  return client.api(`/users/${mailboxEmail}/messages/${messageId}`).get();
+}
+
+export async function fetchAttachments(mailboxEmail: string, messageId: string): Promise<GraphAttachment[]> {
+  const client = await graphClient();
+  const res = await client.api(`/users/${mailboxEmail}/messages/${messageId}/attachments`).get();
+  return res.value || [];
 }
 ```
 
-- [ ] **Step 3: Poll-Endpoint schreiben**
+- [ ] **Step 3: Webhook-Endpoint**
 
 ```typescript
-// app/api/cron/akquise-poll/route.ts
-import { imapConnect } from '../../akquise/_lib/imapClient';
+// app/api/akquise/webhook/route.ts
+import { fetchMail } from '../_lib/fetchMail';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 30;
 
+// Graph-Subscription-Validation: bei Anlage einer Subscription macht Graph
+// einen GET mit ?validationToken=...
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const token = url.searchParams.get('validationToken');
+  if (token) {
+    return new Response(token, {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  }
+  return new Response('Missing validationToken', { status: 400 });
+}
+
+// Eigentlicher Push: Graph schickt JSON mit value[]
 export async function POST(req: Request) {
-  const auth = req.headers.get('authorization');
-  if (auth !== `Bearer ${process.env.CRON_SECRET_AKQUISE}`) {
-    return new Response('Unauthorized', { status: 401 });
+  // Validation-POST hat ?validationToken= im Query-String (mit text/plain Body)
+  const url = new URL(req.url);
+  const token = url.searchParams.get('validationToken');
+  if (token) {
+    return new Response(token, {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  }
+
+  const body = await req.json();
+  if (!Array.isArray(body.value)) {
+    return new Response('Invalid payload', { status: 400 });
   }
 
   const supa = supabaseAdmin();
-  const client = await imapConnect();
+  const mailbox = process.env.MS_GRAPH_MAILBOX_EMAIL!;
 
-  try {
-    const lock = await client.getMailboxLock('CRM-Eingang');
-    try {
-      // Idempotenz: nicht via SEEN-Flag (unzuverlässig wegen Multi-Client-Sync mit Handy/Outlook),
-      // sondern via mail_queue.message_id PRIMARY KEY. Wir holen ALLE Mails im Ordner —
-      // Duplikate wirft der Unique-Constraint sauber raus.
-      const uids = await client.search({ all: true });
-      let enqueued = 0;
-      let skipped = 0;
-
-      for (const uid of uids) {
-        const msg = await client.fetchOne(uid, { envelope: true, source: true });
-        const messageId = msg.envelope.messageId;
-        if (!messageId) {
-          await client.messageFlagsAdd(uid, ['\\Seen']);
-          continue;
-        }
-
-        const { error } = await supa
-          .from('mail_queue')
-          .insert({
-            message_id: messageId,
-            imap_uid: uid as number,
-            status: 'pending',
-            raw_source_sha: await sha256(msg.source as Buffer),
-          });
-
-        if (error) {
-          if (error.code === '23505') {
-            skipped += 1;
-            await client.messageFlagsAdd(uid, ['\\Seen']);
-            continue;
-          }
-          throw error;
-        }
-
-        // Stage-Worker triggern (fire-and-forget)
-        const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.SITE_URL;
-        fetch(`${base}/api/akquise/process`, {
-          method: 'POST',
-          headers: {
-            'authorization': `Bearer ${process.env.CRON_SECRET_AKQUISE}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({ messageId, rawSource: (msg.source as Buffer).toString('base64') }),
-        }).catch(() => { /* fire-and-forget */ });
-
-        await client.messageFlagsAdd(uid, ['\\Seen']);
-        enqueued += 1;
-      }
-
-      return Response.json({ ok: true, enqueued, skipped, total: uids.length });
-    } finally {
-      lock.release();
+  for (const notification of body.value) {
+    if (notification.clientState !== process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE) {
+      console.warn('Unauthorized webhook notification (clientState mismatch)');
+      continue;
     }
-  } finally {
-    await client.logout();
+    if (notification.changeType !== 'created') continue;
+
+    const graphMessageId = notification.resourceData?.id;
+    if (!graphMessageId) continue;
+
+    const mail = await fetchMail(mailbox, graphMessageId);
+    const messageId = mail.internetMessageId;
+
+    const { error } = await supa.from('mail_queue').insert({
+      message_id: messageId,
+      graph_message_id: graphMessageId,
+      status: 'pending',
+    });
+
+    if (error) {
+      if (error.code === '23505') continue; // schon verarbeitet, idempotent skip
+      throw error;
+    }
+
+    // Stage-Worker triggern (fire-and-forget)
+    const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.SITE_URL;
+    fetch(`${base}/api/akquise/process`, {
+      method: 'POST',
+      headers: {
+        'authorization': `Bearer ${process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ messageId, graphMessageId }),
+    }).catch(() => {});
   }
-}
 
-async function sha256(buf: Buffer): Promise<string> {
-  const crypto = await import('node:crypto');
-  return crypto.createHash('sha256').update(buf).digest('hex');
+  return Response.json({ ok: true });
 }
 ```
 
-- [ ] **Step 4: Lokaler Test des Poll-Endpoints**
+- [ ] **Step 4: Subscription-Renewal-Cron**
 
-Vercel-Dev starten:
-```powershell
-npx vercel dev
+```typescript
+// app/api/cron/renew-subscription/route.ts
+import { graphClient } from '../../akquise/_lib/msGraphClient';
+
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+
+export async function POST(req: Request) {
+  if (req.headers.get('authorization') !== `Bearer ${process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE}`) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  const client = await graphClient();
+  const subs = await client.api('/subscriptions').get();
+
+  const newExpiry = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+  const renewed: string[] = [];
+
+  for (const sub of subs.value || []) {
+    if (sub.notificationUrl?.includes('/api/akquise/webhook')) {
+      await client.api(`/subscriptions/${sub.id}`).patch({ expirationDateTime: newExpiry });
+      renewed.push(sub.id);
+    }
+  }
+
+  return Response.json({ ok: true, renewed });
+}
 ```
 
-Test-Mail manuell in CRM-Eingang schieben, dann:
+- [ ] **Step 5: vercel.json — Cron für Renewal**
 
+Bereits in Task 7b/Step 3 konfiguriert (`crons`-Array enthält den Renewal-Eintrag mit `0 6 * * *`). Nochmals prüfen, dass die Datei den Stand aus 7b widerspiegelt.
+
+- [ ] **Step 6: Lokaler Test des Webhook-Endpoints**
+
+Webhook-Validation-Test:
 ```powershell
-curl -X POST http://localhost:3000/api/cron/akquise-poll `
-  -H "authorization: Bearer <CRON_SECRET_AKQUISE-aus-.env.local>"
+curl "http://localhost:3000/api/akquise/webhook?validationToken=abc123"
 ```
+Expected: HTTP 200 mit Body `abc123` und Content-Type text/plain.
 
-Expected: JSON `{ "ok": true, "enqueued": 1, "skipped": 0, "total": 1 }`, Mail in Outlook gilt als gelesen, neue Zeile in `mail_queue` mit status `pending`.
+Webhook-POST-Test (fake payload):
+```powershell
+$body = '{"value":[{"subscriptionId":"test","changeType":"created","resourceData":{"id":"DUMMY-MSG-ID"},"clientState":"<dein-MS_GRAPH_WEBHOOK_CLIENT_STATE>"}]}'
+curl -X POST http://localhost:3000/api/akquise/webhook -H "content-type: application/json" -d $body
+```
+Expected: 500 weil DUMMY-MSG-ID kein echtes Mail-ID ist — aber 401/403 darf NICHT kommen (das wäre clientState-Mismatch). Echter E2E-Test kommt in Task 7j.
 
-(Process-Endpoint existiert noch nicht — Status bleibt `pending`, das ist OK für diesen Test.)
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```powershell
-git add src/lib/supabaseAdmin.ts app/api/akquise/_lib/imapClient.ts app/api/cron/akquise-poll/route.ts
-git commit -m "feat(akquise): imap poll-endpoint + supabase admin client"
+git add src/lib/supabaseAdmin.ts app/api/akquise/_lib/fetchMail.ts app/api/akquise/webhook/route.ts app/api/cron/renew-subscription/route.ts vercel.json
+git commit -m "feat(akquise): graph webhook endpoint + subscription renewal"
 ```
 
 ---
@@ -769,25 +895,31 @@ import { parseEmail } from '@/../app/api/akquise/_lib/parseEmail';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+function loadFixture(name: string) {
+  const raw = JSON.parse(readFileSync(join(__dirname, 'fixtures', name), 'utf-8'));
+  // Attachment-contentBytes sind base64 — Test rekonstruiert nichts; parseEmail kümmert sich darum
+  return raw;
+}
+
 describe('parseEmail', () => {
-  it('extrahiert PDF-Anhänge', async () => {
-    const raw = readFileSync(join(__dirname, 'fixtures/mail-with-pdf.eml'));
-    const result = await parseEmail(raw);
+  it('extrahiert PDF-Anhänge', () => {
+    const { mail, attachments } = loadFixture('graph-mail-with-pdf.json');
+    const result = parseEmail(mail, attachments);
     expect(result.attachments).toHaveLength(1);
     expect(result.attachments[0].name).toMatch(/\.pdf$/i);
     expect(result.attachments[0].buffer.length).toBeGreaterThan(100);
   });
 
-  it('extrahiert Links aus Mailtext', async () => {
-    const raw = readFileSync(join(__dirname, 'fixtures/mail-with-link.eml'));
-    const result = await parseEmail(raw);
+  it('extrahiert Links aus Mailtext', () => {
+    const { mail, attachments } = loadFixture('graph-mail-with-link.json');
+    const result = parseEmail(mail, attachments);
     expect(result.links.length).toBeGreaterThan(0);
     expect(result.links[0]).toMatch(/^https?:\/\//);
   });
 
-  it('liefert Subject + From', async () => {
-    const raw = readFileSync(join(__dirname, 'fixtures/mail-with-pdf.eml'));
-    const result = await parseEmail(raw);
+  it('liefert Subject + From', () => {
+    const { mail, attachments } = loadFixture('graph-mail-with-pdf.json');
+    const result = parseEmail(mail, attachments);
     expect(result.subject).toBeTruthy();
     expect(result.from.email).toMatch(/@/);
   });
@@ -796,7 +928,34 @@ describe('parseEmail', () => {
 
 - [ ] **Step 2: Fixtures anlegen**
 
-Mindestens drei echte Mails aus dem Posteingang als `.eml` exportieren (Outlook → Speichern unter → eml-Format) und nach `tests/akquise/fixtures/` legen. Empfohlen: `mail-with-pdf.eml`, `mail-with-link.eml`, `mail-multi-pdf.eml`.
+JSON-Fixtures (Graph-API-Response-Beispiele) nach `tests/akquise/fixtures/` legen:
+
+```
+tests/akquise/fixtures/graph-mail-with-pdf.json    — Beispiel-Response mit PDF-Attachment
+tests/akquise/fixtures/graph-mail-with-link.json
+tests/akquise/fixtures/graph-mail-multi-pdf.json
+```
+
+Format:
+```json
+{
+  "mail": {
+    "id": "AAMkAGIxxx",
+    "internetMessageId": "<abc123@web.de>",
+    "subject": "Exposé MFH Dortmund",
+    "from": { "emailAddress": { "name": "Hans Müller", "address": "h.mueller@immo.de" } },
+    "toRecipients": [{ "emailAddress": { "address": "andre-petrov@web.de" } }],
+    "receivedDateTime": "2026-05-12T10:00:00Z",
+    "body": { "contentType": "html", "content": "<p>...</p>" },
+    "hasAttachments": true
+  },
+  "attachments": [
+    { "id": "AAxxx", "name": "Exposé.pdf", "contentType": "application/pdf", "size": 12345, "contentBytes": "<base64>" }
+  ]
+}
+```
+
+User erstellt die Fixtures manuell aus echten Graph-API-Responses während Task 7j-Test (z.B. via `client.api('/users/.../messages/<id>').get()` + `/attachments`).
 
 - [ ] **Step 3: Test laufen — muss failen**
 
@@ -811,53 +970,56 @@ Expected: FAIL ("Cannot find module ...parseEmail").
 
 ```typescript
 // app/api/akquise/_lib/parseEmail.ts
-import { simpleParser } from 'mailparser';
+import type { GraphMail, GraphAttachment } from './fetchMail';
 
 export interface ParsedEmail {
   messageId: string;
+  graphMessageId: string;
   subject: string;
   from: { name?: string; email: string };
   to: string[];
   date: Date;
   text: string;
   html: string;
+  inReplyTo?: string;
   attachments: Array<{ name: string; contentType: string; buffer: Buffer }>;
   links: string[];
 }
 
-export async function parseEmail(rawSource: Buffer | string): Promise<ParsedEmail> {
-  const parsed = await simpleParser(rawSource);
-
-  const text = parsed.text || '';
-  const html = parsed.html || '';
+export function parseEmail(mail: GraphMail, attachments: GraphAttachment[]): ParsedEmail {
+  const html = mail.body.contentType === 'html' ? mail.body.content : '';
+  const text = mail.body.contentType === 'text' ? mail.body.content : htmlToText(html);
   const links = extractLinks(`${text}\n${html}`);
 
   return {
-    messageId: parsed.messageId || '',
-    subject: parsed.subject || '',
+    messageId: mail.internetMessageId,
+    graphMessageId: mail.id,
+    subject: mail.subject || '',
     from: {
-      name: parsed.from?.value?.[0]?.name,
-      email: parsed.from?.value?.[0]?.address || '',
+      name: mail.from?.emailAddress?.name,
+      email: mail.from?.emailAddress?.address || '',
     },
-    to: parsed.to?.value?.map(v => v.address || '').filter(Boolean) ?? [],
-    date: parsed.date || new Date(),
+    to: mail.toRecipients?.map(r => r.emailAddress.address) ?? [],
+    date: new Date(mail.receivedDateTime),
     text,
-    html: typeof html === 'string' ? html : '',
-    attachments: (parsed.attachments || [])
-      .filter(a => a.content && a.filename)
-      .map(a => ({
-        name: a.filename!,
-        contentType: a.contentType || 'application/octet-stream',
-        buffer: a.content as Buffer,
-      })),
+    html,
+    inReplyTo: mail.inReplyTo,
+    attachments: attachments.map(a => ({
+      name: a.name,
+      contentType: a.contentType || 'application/octet-stream',
+      buffer: Buffer.from(a.contentBytes, 'base64'),
+    })),
     links,
   };
 }
 
+function htmlToText(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function extractLinks(content: string): string[] {
   const re = /https?:\/\/[^\s"'<>)]+/g;
-  const matches = content.match(re) || [];
-  return Array.from(new Set(matches));
+  return Array.from(new Set(content.match(re) || []));
 }
 ```
 
@@ -1712,6 +1874,7 @@ export async function resolveLink(url: string): Promise<{ name: string; buffer: 
 
 ```typescript
 // app/api/akquise/process/route.ts
+import { fetchMail, fetchAttachments } from '../_lib/fetchMail';
 import { parseEmail } from '../_lib/parseEmail';
 import { classifyPdf } from '../_lib/classifyPdf';
 import { extractAddress } from '../_lib/extractAddress';
@@ -1728,17 +1891,22 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET_AKQUISE}`) {
+  if (req.headers.get('authorization') !== `Bearer ${process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE}`) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const { messageId, rawSource } = await req.json();
+  const { messageId, graphMessageId } = await req.json();
+  const mailbox = process.env.MS_GRAPH_MAILBOX_EMAIL!;
   const supa = supabaseAdmin();
 
   await supa.from('mail_queue').update({ status: 'processing', started_at: new Date().toISOString() }).eq('message_id', messageId);
 
   try {
-    const mail = await parseEmail(Buffer.from(rawSource, 'base64'));
+    const [graphMail, attachments] = await Promise.all([
+      fetchMail(mailbox, graphMessageId),
+      fetchAttachments(mailbox, graphMessageId),
+    ]);
+    const mail = parseEmail(graphMail, attachments);
 
     const linkAttachments: Array<{ name: string; buffer: Buffer; contentType: string }> = [];
     for (const link of mail.links) {
@@ -1831,7 +1999,9 @@ export async function POST(req: Request) {
 
 - [ ] **Step 4: Lokaler E2E-Test mit Test-Mail**
 
-Test-Mail in CRM-Eingang → Poll-Endpoint per curl → 30s warten → in Supabase prüfen:
+Test-Mail in CRM-Eingang verschieben (manuell in Outlook), Graph-Subscription (siehe Task 7l) muss live sein — Webhook trifft ein → 30s warten → in Supabase prüfen:
+
+(Alternativ für lokales Mockup: Webhook-POST per curl mit echtem `graphMessageId` aus M365, siehe 7d-Step-6.)
 
 ```sql
 SELECT m.message_id, m.status, m.error_msg, d.address, d.priority_score, d.workspace_path
@@ -1943,54 +2113,114 @@ git commit -m "feat(crm): pre_screened-status + score-spalte + workspace-pfad-bu
 
 ---
 
-## Task 7l: Cron-job.org konfigurieren + alte Pipeline deprecaten
+## Task 7l: Graph-Subscription registrieren + automatisierung-aquise deprecaten
 
 **Files:**
+- Create: `scripts/create-graph-subscription.mjs` (einmaliges Setup-Skript, nicht committed)
 - Modify: `../automatisierung-aquise/README.md` (Deprecation-Banner)
 - Modify: `c:/meine-projekte/README.md` (Mono-Repo-Index)
 
-- [ ] **Step 1: cron-job.org Cronjob anlegen**
+- [ ] **Step 1: Subscription-Setup-Skript schreiben**
 
-In cron-job.org einloggen:
-- URL: `https://immo-crm-xi.vercel.app/api/cron/akquise-poll`
-- Method: POST
-- Header: `Authorization: Bearer <CRON_SECRET_AKQUISE>`
-- Schedule: `*/5 * * * *` (alle 5 Min)
-- Failure Notification: Email an `andre-petrov@web.de` bei non-2xx
+```javascript
+// scripts/create-graph-subscription.mjs (gitignored)
+import 'dotenv/config';
+import { ConfidentialClientApplication } from '@azure/msal-node';
 
-- [ ] **Step 2: 10-Min-Live-Test**
+const app = new ConfidentialClientApplication({
+  auth: {
+    clientId: process.env.MS_GRAPH_CLIENT_ID,
+    clientSecret: process.env.MS_GRAPH_CLIENT_SECRET,
+    authority: `https://login.microsoftonline.com/${process.env.MS_GRAPH_TENANT_ID}`,
+  },
+});
 
-Test-Mail in CRM-Eingang → 5 Min warten → in Supabase prüfen ob Lead automatisch entstanden ist (ohne curl-Trigger). Cron-job.org-Log muss "200 OK" zeigen.
+const tokenResp = await app.acquireTokenByRefreshToken({
+  refreshToken: process.env.MS_GRAPH_REFRESH_TOKEN,
+  scopes: ['Mail.Read', 'Files.ReadWrite.All', 'offline_access'],
+});
 
-- [ ] **Step 3: automatisierung-aquise deaktivieren**
+const mailbox = process.env.MS_GRAPH_MAILBOX_EMAIL;
+const folderName = 'CRM-Eingang';
 
-Wenn Live-Test 7l-Step-2 grün:
+// 1. Folder-ID lookup
+const foldersRes = await fetch(`https://graph.microsoft.com/v1.0/users/${mailbox}/mailFolders?$filter=displayName eq '${folderName}'`, {
+  headers: { Authorization: `Bearer ${tokenResp.accessToken}` },
+});
+const folders = (await foldersRes.json()).value;
+if (!folders.length) throw new Error(`Ordner '${folderName}' nicht gefunden`);
+const folderId = folders[0].id;
+console.log('Folder-ID:', folderId);
+
+// 2. Subscription erstellen
+const expiry = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+const subRes = await fetch('https://graph.microsoft.com/v1.0/subscriptions', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${tokenResp.accessToken}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    changeType: 'created',
+    notificationUrl: 'https://immo-crm-xi.vercel.app/api/akquise/webhook',
+    resource: `/users/${mailbox}/mailFolders('${folderId}')/messages`,
+    expirationDateTime: expiry,
+    clientState: process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE,
+  }),
+});
+const sub = await subRes.json();
+console.log('Subscription:', sub);
+if (!sub.id) throw new Error('Subscription-Anlage fehlgeschlagen: ' + JSON.stringify(sub));
+console.log('OK — Subscription-ID:', sub.id, 'Expires:', sub.expirationDateTime);
+```
+
+- [ ] **Step 2: Vorbedingung — Vercel-Deployment muss live sein**
+
+Bevor das Skript läuft, muss `app/api/akquise/webhook/route.ts` auf https://immo-crm-xi.vercel.app deployed sein (sonst schlägt Graphs Validation-Call fehl).
+
+`git push` → Vercel deployt → verifiziere mit curl:
+```powershell
+curl "https://immo-crm-xi.vercel.app/api/akquise/webhook?validationToken=test"
+```
+Expected: HTTP 200 mit Body `test`.
+
+- [ ] **Step 3: Subscription erstellen**
+
+```powershell
+node scripts/create-graph-subscription.mjs
+```
+Expected: `OK — Subscription-ID: <uuid>`. Subscription-ID notieren.
+
+- [ ] **Step 4: Live-Test**
+
+Test-Mail an `andre-petrov@web.de` schicken → web.de forwarded → Outlook-Regel verschiebt nach CRM-Eingang → Graph schickt Webhook an Vercel → Lead erscheint im CRM (Status pre_screened).
+
+Verifikation in Supabase:
+```sql
+SELECT message_id, graph_message_id, status, deal_id FROM mail_queue ORDER BY enqueued_at DESC LIMIT 5;
+```
+
+- [ ] **Step 5: automatisierung-aquise deaktivieren** (wenn Step 4 grün)
 
 Windows Task Scheduler öffnen → `Akquise-Pipeline` rechtsklick → Deaktivieren. Genauso `Akquise-Pipeline-HealthCheck`.
 
 In `../automatisierung-aquise/README.md` oben einfügen:
-
 ```markdown
 > ## ⚠️ DEPRECATED ab 2026-MM-DD
 >
-> Ersetzt durch Cloud-Pipeline im ImmoCRM-Repo.
+> Ersetzt durch Cloud-Pipeline im ImmoCRM-Repo via Microsoft-Graph-Webhook.
 > Siehe `Immobilien/ImmoCRM/docs/superpowers/specs/2026-05-11-akquise-pipeline-cloud-design.md`.
-> Code bleibt als historische Referenz für Regex-Heuristiken (m05_address_extractor).
 ```
 
-- [ ] **Step 4: Gmail-Forwarding abschalten** (falls aktiv)
-
-In Gmail-Einstellungen → Weiterleitung und POP/IMAP → bestehenden Forward-Filter für web.de-Mails deaktivieren. Verifikation: 24 h später Gmail-INBOX checken — keine neuen Akquise-Mails.
-
-- [ ] **Step 5: Mono-Repo-README updaten**
+- [ ] **Step 6: Mono-Repo-README updaten**
 
 In `c:/meine-projekte/README.md` Eintrag für `automatisierung-aquise` mit "(deprecated, siehe ImmoCRM-Pipeline)" markieren.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```powershell
 git add ../automatisierung-aquise/README.md ../../README.md
-git commit -m "chore(akquise): cloud-pipeline live, alte python-pipeline deprecated"
+git commit -m "chore(akquise): graph-webhook live, alte python-pipeline deprecated"
 ```
 
 ---
@@ -2015,9 +2245,9 @@ Den bestehenden Schritt-7-Block (Zeile 177–193) komplett ersetzen durch:
 
 **Architektur:** Vercel Edge Functions (TypeScript) im ImmoCRM-Repo. Aufteiler bleibt komplett unberührt.
 
-**Pipeline-Stages:** Poll-Endpoint (alle 5 Min via cron-job.org) → IMAP-web.de → mail_queue → Stage-Worker (parse, classify, extract address, extract contact, QuickCheck-Stub, OneDrive-Upload mit Workspace, insertLead mit pre_screened-Status).
+**Pipeline-Stages:** web.de-Auto-Forward + Outlook-Regel → M365-Ordner `CRM-Eingang` → Microsoft-Graph-Subscription → Webhook → mail_queue → Stage-Worker (fetchMail via Graph, parse, classify, extract address, extract contact, QuickCheck-Stub, OneDrive-Upload mit Workspace, insertLead mit pre_screened-Status). Subscription-Renewal täglich via Vercel-Cron.
 
-**Sub-Schritte (siehe `docs/superpowers/plans/2026-05-12-schritt-7-akquise-pipeline-cloud.md`):** S1 Spike, 7a–7m Bauschritte.
+**Sub-Schritte (siehe `docs/superpowers/plans/2026-05-12-schritt-7-akquise-pipeline-cloud.md`):** S1 Spike, S2 Forward+Outlook-Regel, 7a–7m Bauschritte.
 
 **Output:** Lead landet in CRM-Tab Leads mit Filter `Status=pre_screened`. Doppelklick auf workspace-Datei öffnet VS Code + Claude Code mit komplettem QuickCheck-Kontext.
 
@@ -2043,12 +2273,13 @@ Neue Architektur: Cloud-Pipeline im ImmoCRM-Repo holt Mails ab, macht QuickCheck
 - Mobile Sortierung möglich (Mail per Handy in CRM-Eingang-Ordner schieben)
 - Aufteiler nur noch für 2-3 Top-Leads/Tag statt für alles
 - Klare Funnel-Stufen: pre_screened → offen → berechnet → absage
+- Microsoft Graph Webhook ermöglicht Echtzeit-Push (keine Polling-Latenz)
 - Spec 2026-05-11 (Council-validiert)
 
 ### Konsequenzen
 - `automatisierung-aquise` wird deprecated (siehe Task 7l)
 - Gmail-Forwarding wird abgeschaltet
-- web.de IMAP-App-Passwort als neue Critical-Dependency
+- Microsoft-Graph-Subscription auf M365-Postfach als neue Critical-Dependency (siehe ADR-021)
 
 ---
 
@@ -2118,6 +2349,33 @@ Drei-Wege-Matching: Hard (Email-Exakt-Match → bestehenden contact aktualisiere
 ### Konsequenzen
 - Owner sieht Soft-Match-Warnungen im Kontakt-Chat-Panel
 - Falls Verdacht falsch ist: Owner muss manuell mergen (außerhalb MVP)
+
+---
+
+## ADR-021 — Microsoft Graph Webhook statt IMAP-Polling
+
+- **Datum:** 2026-05-12
+- **Status:** Accepted (ersetzt zwischenzeitliche Polling-Annahme aus Spec 2026-05-11)
+- **Schritt:** 7d
+
+### Kontext
+Ursprünglich war IMAP-Polling auf web.de alle 5 Min via cron-job.org geplant. User hat eine M365-Business-Lizenz (Tenant appv7878.onmicrosoft.com) und will Echtzeit-Push.
+
+### Entscheidung
+Akquise-Mails werden via web.de-Auto-Forward + Outlook-Regel ins M365-Postfach in Ordner `CRM-Eingang` umgeleitet. Microsoft Graph Subscription auf diesen Ordner schickt Webhook bei neuer Mail an Vercel-Endpoint. Subscription wird täglich automatisch erneuert (3-Tages-Limit von Graph).
+
+### Begründung
+- Echtzeit-Reaktion (Sekunden statt 5 Min)
+- Eine einzige Microsoft-Graph-Auth deckt OneDrive + Mail-Read ab
+- Kein Drittanbieter (cron-job.org entfällt)
+- Robuste Idempotenz via mail_queue.message_id PRIMARY KEY
+
+### Konsequenzen
+- web.de-Auto-Forward muss eingerichtet werden (Task S2)
+- Outlook-Regel im M365-Postfach (Task S2)
+- Graph-Subscription-Renewal-Cron täglich um 6 Uhr UTC (Vercel-internen Cron)
+- imapflow-Dependency entfällt (Task 7b)
+- mail_queue.imap_uid Spalte entfällt, mail_queue.graph_message_id Spalte hinzu (Task 7a)
 ```
 
 - [ ] **Step 3: 04_progress.md — Schritt 7 auf ✅ setzen**
@@ -2125,7 +2383,7 @@ Drei-Wege-Matching: Hard (Email-Exakt-Match → bestehenden contact aktualisiere
 Zeile mit Schritt 7 anpassen:
 
 ```markdown
-| 7 | Akquise-Pipeline (Cloud) | ✅ | 2026-MM-DD | 017-020 | IMAP-Poll + OneDrive-Upload + QuickCheck-Stub + Pre-Screening-Lead + Workspace-Datei. Stub-QuickCheck bis Modul-0-Überarbeitung. Stichprobe: 20/20 Mails verarbeitet, 17/20 mit Adresse, 0 Crashs. automatisierung-aquise deprecated, Gmail-Forwarding aus. |
+| 7 | Akquise-Pipeline (Cloud) | ✅ | 2026-MM-DD | 017-021 | Microsoft-Graph-Webhook + OneDrive-Upload + QuickCheck-Stub + Pre-Screening-Lead + Workspace-Datei. Stub-QuickCheck bis Modul-0-Überarbeitung. Stichprobe: 20/20 Mails verarbeitet, 17/20 mit Adresse, 0 Crashs. automatisierung-aquise deprecated, Gmail-Forwarding aus. |
 ```
 
 Und Definition-of-Done:
@@ -2149,7 +2407,7 @@ Jeder Stage-Worker-Lauf schreibt `console.log({ stage, messageId, durationMs })`
 - Niemals OneDrive-Upload-Fail blockt CRM-Insert (Workaround: Workspace-Pfad bleibt null, User sieht in der UI dass Datei fehlt)
 
 ## Idempotenz-Garantie
-`mail_queue.message_id` ist PRIMARY KEY. Doppelte Webhook-Invocations werfen `unique_violation` (PostgreSQL-Code 23505) → Poll-Endpoint interpretiert als "schon verarbeitet" und setzt nur \\Seen-Flag.
+`mail_queue.message_id` ist PRIMARY KEY (gefüttert aus `internetMessageId` der Graph-Mail). Doppelte Webhook-Notifications werfen `unique_violation` (PostgreSQL-Code 23505) → Webhook-Endpoint interpretiert als "schon verarbeitet" und überspringt das Enqueuen (siehe `app/api/akquise/webhook/route.ts`).
 
 ## QuickCheck-Logik
 Stub im MVP (siehe `quickCheck.ts`). Echte Logik wird separat aus Modul-0-Überarbeitung im Aufteiler-Repo abgeleitet und in `quickCheck.ts` portiert. Schema-Felder (`priority_score`, `priority_reason`) sind dafür bereits vorbereitet.
@@ -2185,9 +2443,9 @@ git commit -m "docs(schritt-7): pipeline cloud abgeschlossen, ADR-017-020, stich
 ## Self-Review
 
 ### Spec-Coverage
-Alle Punkte aus Spec §4.1–§4.8 + User-Erweiterungen vom 2026-05-12 sind durch Tasks abgedeckt:
-- §4.1 Cron-Trigger → Task 7l
-- §4.2 Poll-Endpoint → Task 7d
+Alle Punkte aus Spec §4.1–§4.8 + User-Erweiterungen vom 2026-05-12 sind durch Tasks abgedeckt (Mail-Eingang via Microsoft-Graph-Webhook statt IMAP-Polling — siehe ADR-021):
+- §4.1 Trigger → Task 7l (Graph-Subscription)
+- §4.2 Eingangs-Endpoint → Task 7d (Webhook + Subscription-Renewal)
 - §4.3 Stage-Worker → Task 7j
 - §4.4 Idempotenz mail_queue → Task 7a (Migration) + Task 7d (Insert mit Unique-Violation-Handling)
 - §4.5 OneDrive → Task 7c
@@ -2217,4 +2475,5 @@ Alle Signaturen konsistent.
 ### Bekannte Risiken nach Plan-Abschluss
 - `claude` muss in der PATH-Umgebung sein, damit `tasks.runOn:folderOpen` funktioniert. Verifikation in Task 7j-Step-5.
 - Vercel-`app/`-Folder-Konvention neben bestehendem Vite — bei Konflikt im Build evtl. `vercel.json` manuell anpassen.
-- web.de-IMAP-Connection-Stabilität ist im 5-Min-Intervall unkritisch, aber langfristig zu beobachten (Cron-job.org-Failure-Alerts).
+- Microsoft-Graph-Subscription läuft max. 3 Tage und wird täglich via Vercel-Cron erneuert. Bei Renewal-Fail (Token abgelaufen, Vercel-Cron-Outage): Subscription wird beim nächsten Lauf neu angelegt werden müssen (Skript aus Task 7l). Monitoring: Vercel-Logs auf `renew-subscription` checken.
+- web.de-Auto-Forward + Outlook-Regel sind Konfigurations-Punkte außerhalb der Codebasis — bei Forward-Stop laufen keine Mails mehr in den CRM-Eingang-Ordner (Verifikation manuell durch User).
