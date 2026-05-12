@@ -36,3 +36,59 @@ Für ein „rot"-Szenario muss das Angebot **über** dem Konsens liegen (z.B. 1.
 **Phase 2 grün.** Keine Fix-Task vor Phase 3 nötig. Orchestrator + Modul 0 sind funktional konsistent, State-Schema und Validator greifen wie erwartet.
 
 **Offen für Live-Test in neuer Session:** Verbliebener nicht-automatisierbarer Test ist der reale Skill-Aufruf via `Skill`-Tool in einer frischen Claude-Code-Session (User-Interaktion via `AskUserQuestion`). Wird beim ersten echten Objekt in Phase 3 mitabgedeckt.
+
+---
+
+## Phase 3 Smoke-Test (Task 17) — 2026-05-12
+
+**Ziel:** Vollanalyse-Sequenz 0→1→2→3→4 mit Test-Objekt Prosperstr. 59, 45356 Essen-Dellwig funktional verifizieren.
+
+**Methodik:** Wie Phase 2: Live-Skill-Aufruf nicht aus Build-Session möglich → funktionaler Spezifikations-Check über State-Aufbau + Validator-Lauf + Akzeptanzkriterien-Prüfung.
+
+### Mini-Tests pro Modul (Tasks 13–16)
+
+| Task | Modul | Test | Status |
+|------|-------|------|--------|
+| 13 | Modul 1 Objektbasis | State `modul_1` mit 5 WE (Prosperstr.), BRW 380 €/m², Gebäudeanteil 81.2 % | ✓ Validator exit 0 |
+| 14 | Modul 2 RND/AfA | `rnd_jahre=56`, `rnd_frozen=true`, AfA-Empfehlung 1.71 % | ✓ Validator exit 0, Freeze-Mechanik testet: `rnd_frozen=false` führt zu Validator exit 1 (`[SCHEMA] modul_2/rnd_frozen: True was expected`) |
+| 15 | Modul 3 Massnahmen | 7 Einträge incl. RND-Gutachten (5×1.000 €) + WEG-Teilung (15.000 €), Σ netto 169.000 € | ✓ Validator exit 0; Asset-Trennung-Negativtest: Eintrag mit `geplant="Mietsubvention 2 Jahre"` → Validator exit 1 (`[BUSINESS] Asset-Trennung verletzt: …geplant enthält 'subvention'`) |
+| 16 | Modul 4 Mietsituation | 5 WE-Mieten, Mietsubvention Σ 861.06 €/Monat (entspricht XML-Test-Vektor ≈ 125.500 € total über Reach-Time) | ✓ Validator exit 0 |
+
+### Akzeptanzkriterien-Vollanalyse (Task 17.1)
+
+Geprüft auf `runs/prosperstr-59-essen-dellwig/state.json` nach allen 4 Modul-Läufen:
+
+| # | Kriterium | Soll | Ist | Status |
+|---|-----------|------|-----|--------|
+| 1 | `modul_2.rnd_frozen` | `true` (Schema-const) | `true` | ✓ |
+| 2 | Asset-Trennung `modul_3.massnahmen_liste` | keine `subvention`/`rücklage` in Texten | keine | ✓ |
+| 3 | `modul_3` hat RND-Gutachten-Pflicht-Eintrag | ja, kategorie=`Sonstiges` | ja | ✓ |
+| 4 | `modul_3` hat WEG-Teilung-Pflicht-Eintrag | ja, kategorie=`Sonstiges` | ja | ✓ |
+| 5 | `modul_3.rnd_gutachten_netto_eur == 1.000 × N_WE` | 5.000 € (5 WE) | 5.000 € | ✓ |
+| 6 | `modul_4.we_mieten` Count = `modul_1.we_liste` Count | 5 == 5 | 5 == 5 | ✓ |
+| 7 | Mietsubvention NICHT in `modul_3` | ja (separat in `modul_4.mietsubventionen_summe_eur_pro_monat`) | ja | ✓ |
+| 8 | `modul_4.mietsubventionen_summe_eur_pro_monat == Σ we_mieten[].mietsubvention_eur_pro_monat` | 861.06 ≈ 861.07 (Rundung) | ok (Δ < 0.5) | ✓ |
+| 9 | Validator-CLI exit 0 für Vollanalyse-State | exit 0 | exit 0 | ✓ |
+| 10 | RND-Freeze: Modul 3 hat `modul_2.rnd_jahre` nicht verändert | 56 J (unverändert nach Modul 3) | 56 J | ✓ |
+
+### Reproduzierbarkeits-Test (Task 17.2) — Live-Lauf-Pendenz
+
+**Markiert als TODO**, nicht Phase-3-blockierend:
+
+Step 17.2 (diff Zone A/B auf zwei Runs mit identischem Input) ist nur **im Live-Skill-Lauf** sinnvoll prüfbar, weil die Output-Dateien (`runs/<slug>/modul-N-output.md`) durch das Skill selbst geschrieben werden, nicht hier. Aus Build-Session lassen sich nur:
+- State-Schema-Constraints (über Validator) → ✓ alle grün
+- Berechnungs-Reproduzierbarkeit (Formeln im Skill deterministisch ausgeschrieben, keine LLM-Improvisation in §3b) → ✓ Skills sind reproduzierbar formuliert
+
+Live-Test offen für eine frische Session nach Phase 4:
+1. Frische Session 1: „Objektbasis für Test-Strasse 1, 45000 Testberg" mit fixen Mock-Inputs durchlaufen, `runs/test-strasse-1-testberg/state.json` + `modul-1-output.md` erzeugen.
+2. Frische Session 2: Identische Inputs nochmal, Slug `test-strasse-1-testberg-run2`.
+3. `diff -q runs/test-strasse-1-testberg/modul-1-output.md runs/test-strasse-1-testberg-run2/modul-1-output.md` — erwartet: Zone A (Tabelle Block 1+2) und Zone B (Tiefenstufe + Konfidenz) byte-identisch; Zone C darf abweichen (Formulierungs-Freiheit).
+
+### Verdict
+
+**Phase 3 grün.** Alle 4 Module (1–4) sind funktional konsistent, Schema-Constraints greifen (rnd_frozen, Asset-Trennung), Vollanalyse-State 0→4 ist valide, Test-Vektoren aus altem XML stimmen (Mietsubvention Σ 125.500 € ≈ XML-Erwartung 125.530 €).
+
+**Offene Punkte für Phase 4 / Live-Lauf:**
+- Reproduzierbarkeits-Test (17.2) im Live-Skill-Lauf nachholen.
+- Brutto/Netto-Verifikation Excel-Template `RENO`-Sheet (siehe `docs/excel_handoff.md` Sektion „Brutto/Netto-Konvention").
+- Live-Skill-Aufruf-Test (Skill-Tool dispatcht Sub-Skills, AskUserQuestion-Interaktion) beim ersten echten Objekt nach Phase 4.
