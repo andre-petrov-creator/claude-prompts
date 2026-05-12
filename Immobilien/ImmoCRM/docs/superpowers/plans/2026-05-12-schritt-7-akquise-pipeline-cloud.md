@@ -662,7 +662,10 @@ export async function POST(req: Request) {
   try {
     const lock = await client.getMailboxLock('CRM-Eingang');
     try {
-      const uids = await client.search({ seen: false });
+      // Idempotenz: nicht via SEEN-Flag (unzuverlässig wegen Multi-Client-Sync mit Handy/Outlook),
+      // sondern via mail_queue.message_id PRIMARY KEY. Wir holen ALLE Mails im Ordner —
+      // Duplikate wirft der Unique-Constraint sauber raus.
+      const uids = await client.search({ all: true });
       let enqueued = 0;
       let skipped = 0;
 
@@ -1234,12 +1237,31 @@ git commit -m "feat(akquise): kontakt + position-heuristik (gf/inhaber/makler)"
 
 ---
 
-## Task 7h: Duplikat-Matching (Hard/Soft/No-Match) + insertLead
+## Task 7h: Duplikat-Matching (Hard/Soft/No-Match) + Mail-Grouping + insertLead
 
 **Files:**
 - Create: `app/api/akquise/_lib/duplicateMatch.ts`
 - Create: `app/api/akquise/_lib/insertLead.ts`
+- Create: `app/api/akquise/_lib/groupMail.ts`        ← NEU 2026-05-12: Mail-Grouping
 - Create: `tests/akquise/duplicateMatch.test.ts`
+- Create: `tests/akquise/groupMail.test.ts`         ← NEU
+
+**Mail-Grouping-Anforderung (Nachtrag 2026-05-12, vom User):**
+
+Mehrere Mails desselben Maklers zum **selben Objekt** (z.B. Exposé + Mieterliste + Energieausweis separat) sollen genau **EINEN** Lead erzeugen. Strategie "beide kombiniert":
+
+1. **Primär: Adress-Match.** Wenn die neue Mail die gleiche Objekt-Adresse hat wie ein bestehender Deal mit Status `pre_screened` UND derselbe Kontakt (Email) ist → keine neue Deal-Zeile, sondern:
+   - PDFs werden zum bestehenden OneDrive-Ordner hinzugefügt (Filename-Conflict: `_2`-Suffix)
+   - `deal_notes` bekommt einen Eintrag "Nachreichung am <Datum>: <Filenames>"
+   - `inbox_message_id` bleibt unverändert (zeigt auf die erste Mail)
+   - QuickCheck wird NICHT neu ausgeführt (Erstbewertung bleibt)
+2. **Sekundär: Reply-To-Match.** Wenn primär nicht greift (Adresse noch nicht extrahiert, z.B. Mailtext "siehe Anhang"), prüfen wir `In-Reply-To`-Header der eingehenden Mail. Wenn dieser auf einen `message_id` in `mail_queue` zeigt → gleicher Trichter, Behandlung wie 1.
+3. **Fallback: Neuer Lead.** Sonst regulärer pre_screened-Lead.
+
+**Akzeptanz für Mail-Grouping:**
+- 3 Mails desselben Maklers zur "Talstr 10 Dortmund" → 1 Lead, 1 OneDrive-Ordner mit allen PDFs, 2 deal_notes-Einträge ("Nachreichung")
+- 3 separate Objekte vom selben Makler → 3 Leads
+- Reply-Thread ohne Adresse in der Antwort → erste Mail = Lead, Folge-Mails fügen PDFs hinzu
 
 - [ ] **Step 1: Failing Tests Duplikat**
 
