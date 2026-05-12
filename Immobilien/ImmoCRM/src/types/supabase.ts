@@ -100,7 +100,9 @@ export type Database = {
           email: string | null
           email_normalized: string | null
           id: string
+          kontakt_count: number
           lead_source: string | null
+          letzter_kontakt: string | null
           name: string
           phone: string | null
           position: string | null
@@ -114,7 +116,9 @@ export type Database = {
           email?: string | null
           email_normalized?: string | null
           id?: string
+          kontakt_count?: number
           lead_source?: string | null
+          letzter_kontakt?: string | null
           name: string
           phone?: string | null
           position?: string | null
@@ -128,7 +132,9 @@ export type Database = {
           email?: string | null
           email_normalized?: string | null
           id?: string
+          kontakt_count?: number
           lead_source?: string | null
+          letzter_kontakt?: string | null
           name?: string
           phone?: string | null
           position?: string | null

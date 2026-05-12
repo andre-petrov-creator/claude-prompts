@@ -95,7 +95,16 @@ export default function AnrufCell({ dealId, letzterAnruf }: Props) {
               Anruf eintragen
             </Button>
           ) : (
-            <span>{formatDate(letzterAnruf)}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setDatepickerOpen(true)
+              }}
+              className="text-left px-1 -mx-1 rounded hover:bg-zinc-100"
+            >
+              {formatDate(letzterAnruf)}
+            </button>
           )}
         </div>
       </PopoverTrigger>

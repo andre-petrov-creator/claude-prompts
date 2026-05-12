@@ -14,8 +14,10 @@ export type EditableContactField =
   | "lead_source"
   | "position"
   | "status"
+  | "letzter_kontakt"
+  | "kontakt_count"
 
-type FieldValue = string | ContactStatus | null
+type FieldValue = string | ContactStatus | number | null
 
 export const useUpdateContactField = () => {
   const qc = useQueryClient()

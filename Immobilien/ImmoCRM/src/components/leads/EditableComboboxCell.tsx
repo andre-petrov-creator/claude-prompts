@@ -5,7 +5,6 @@ import {
   PopoverContent,
   PopoverAnchor,
 } from "@/components/ui/popover"
-import EditableCellShell from "./EditableCellShell"
 
 type Props = {
   value: string | null
@@ -45,12 +44,16 @@ export default function EditableComboboxCell({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
-        <div>
-          <EditableCellShell
-            display={value ?? ""}
-            onActivate={() => setOpen(true)}
-          />
-        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setOpen(true)
+          }}
+          className="w-full text-left min-h-[1.5rem] px-1 -mx-1 rounded hover:bg-zinc-100 flex items-center"
+        >
+          <span className="flex-1 truncate">{value ?? ""}</span>
+        </button>
       </PopoverAnchor>
       <PopoverContent className="w-64 p-0" align="start">
         <div className="p-2 border-b">

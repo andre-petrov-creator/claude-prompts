@@ -13,60 +13,32 @@ export const useContacts = () => {
           .is("deleted_at", null),
         supabase
           .from("deals")
-          .select("contact_id, letzter_anruf")
+          .select("contact_id")
           .is("deleted_at", null),
-        supabase
-          .from("contact_comments")
-          .select("contact_id, created_at"),
+        supabase.from("contact_comments").select("contact_id"),
       ])
       if (contactsRes.error) throw contactsRes.error
       if (dealsRes.error) throw dealsRes.error
       if (commentsRes.error) throw commentsRes.error
 
-      const dealsCountByContact = new Map<string, number>()
-      const lastAnrufByContact = new Map<string, string>()
+      const dealsCount = new Map<string, number>()
       for (const d of dealsRes.data ?? []) {
-        dealsCountByContact.set(
-          d.contact_id,
-          (dealsCountByContact.get(d.contact_id) ?? 0) + 1,
-        )
-        if (d.letzter_anruf) {
-          const prev = lastAnrufByContact.get(d.contact_id)
-          if (!prev || d.letzter_anruf > prev) {
-            lastAnrufByContact.set(d.contact_id, d.letzter_anruf)
-          }
-        }
+        dealsCount.set(d.contact_id, (dealsCount.get(d.contact_id) ?? 0) + 1)
       }
-
-      const commentsCountByContact = new Map<string, number>()
-      const lastCommentByContact = new Map<string, string>()
+      const commentsCount = new Map<string, number>()
       for (const c of commentsRes.data ?? []) {
-        commentsCountByContact.set(
+        commentsCount.set(
           c.contact_id,
-          (commentsCountByContact.get(c.contact_id) ?? 0) + 1,
+          (commentsCount.get(c.contact_id) ?? 0) + 1,
         )
-        const prev = lastCommentByContact.get(c.contact_id)
-        if (!prev || c.created_at > prev) {
-          lastCommentByContact.set(c.contact_id, c.created_at)
-        }
       }
 
-      return (contactsRes.data ?? []).map((contact) => {
-        const lastAnruf = lastAnrufByContact.get(contact.id) ?? null
-        const lastComment = lastCommentByContact.get(contact.id) ?? null
-        const lastContact =
-          lastAnruf && lastComment
-            ? lastAnruf > lastComment.slice(0, 10)
-              ? lastAnruf
-              : lastComment
-            : (lastComment ?? lastAnruf)
-        return {
-          ...contact,
-          last_contact: lastContact,
-          deals_count: dealsCountByContact.get(contact.id) ?? 0,
-          comments_count: commentsCountByContact.get(contact.id) ?? 0,
-        }
-      })
+      return (contactsRes.data ?? []).map((contact) => ({
+        ...contact,
+        last_contact: contact.letzter_kontakt,
+        deals_count: dealsCount.get(contact.id) ?? 0,
+        comments_count: commentsCount.get(contact.id) ?? 0,
+      }))
     },
   })
 }

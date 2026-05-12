@@ -21,4 +21,5 @@ export type ContactRow = Contact & {
   last_contact: string | null
   deals_count: number
   comments_count: number
+  kontakt_count: number
 }

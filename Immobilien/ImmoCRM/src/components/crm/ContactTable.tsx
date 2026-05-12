@@ -18,13 +18,14 @@ import ContactFilters from "./ContactFilters"
 import EditableSelectCell from "@/components/leads/EditableSelectCell"
 import EditableComboboxCell from "@/components/leads/EditableComboboxCell"
 import EditableTextCell from "@/components/leads/EditableTextCell"
+import ClickableDateCell from "@/components/leads/ClickableDateCell"
+import CounterCell from "./CounterCell"
 import {
   useUpdateContactField,
   type EditableContactField,
 } from "@/hooks/useUpdateContactField"
 import { useDistinctValues } from "@/hooks/useDistinctValues"
 import { CONTACT_STATUS_OPTIONS, LEAD_SOURCE_DEFAULTS } from "@/lib/constants"
-import { formatDate } from "@/lib/formatters"
 import { MessageCircle } from "lucide-react"
 
 const STORAGE_KEYS = {
@@ -87,7 +88,9 @@ export default function ContactTable({ data }: { data: ContactRow[] }) {
 
   const patch = (
     contactId: string,
-    p: Partial<Record<EditableContactField, string | ContactStatus | null>>,
+    p: Partial<
+      Record<EditableContactField, string | ContactStatus | number | null>
+    >,
     successMessage = "Gespeichert",
   ) => updateContact.mutate({ contactId, patch: p, successMessage })
 
@@ -178,14 +181,40 @@ export default function ContactTable({ data }: { data: ContactRow[] }) {
         header: "Letzter Kontakt",
         accessorKey: "last_contact",
         size: 140,
-        cell: ({ getValue }) => {
-          const v = getValue() as string | null
-          return v ? (
-            <span className="text-zinc-700">{formatDate(v.slice(0, 10))}</span>
-          ) : (
-            <span className="text-zinc-300">—</span>
-          )
-        },
+        cell: ({ row }) => (
+          <ClickableDateCell
+            value={row.original.last_contact}
+            onSave={(iso) =>
+              patch(
+                row.original.id,
+                iso
+                  ? {
+                      letzter_kontakt: iso,
+                      kontakt_count: row.original.kontakt_count + 1,
+                    }
+                  : { letzter_kontakt: null },
+                "Letzter Kontakt geändert",
+              )
+            }
+          />
+        ),
+      },
+      {
+        id: "kontakt_count",
+        header: "Anzahl",
+        accessorKey: "kontakt_count",
+        size: 110,
+        cell: ({ row, getValue }) => (
+          <CounterCell
+            value={getValue() as number}
+            onChange={(next) =>
+              updateContact.mutate({
+                contactId: row.original.id,
+                patch: { kontakt_count: next },
+              })
+            }
+          />
+        ),
       },
       {
         id: "status",
@@ -367,11 +396,7 @@ export default function ContactTable({ data }: { data: ContactRow[] }) {
               </tr>
             ) : (
               visibleRows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="border-b hover:bg-zinc-50 cursor-pointer"
-                  onClick={() => setPanelContact(row.original)}
-                >
+                <tr key={row.id} className="border-b hover:bg-zinc-50">
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-3 py-2 truncate">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}

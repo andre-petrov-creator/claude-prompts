@@ -671,6 +671,55 @@ Pro Kontakt gibt es einen WhatsApp-Style-Chat-Stream (`contact_comments`). Deal-
 
 ---
 
+## ADR-016 — UX-Polish nach Schritt-6-Test: Direkt-Klick + manueller Letzter-Kontakt
+
+- **Datum:** 2026-05-12
+- **Status:** Accepted (partielle Revision von ADR-014 + Schritt-3-Pattern)
+- **Schritt:** 6 (Polish nach Owner-Test)
+
+### Kontext
+
+Nach erstem visuellen Test der CRM-Tabelle gab es vier Owner-Reklamationen:
+
+1. Status/Dropdown/Datum-Cells öffneten erst nach 2 Sek Hover ein Stift-Icon → User erwartet Direkt-Klick.
+2. Row-Klick öffnete den Chat-Panel auch wenn der User irgendwo in der Zeile klickte (z.B. „Letzter Kontakt"-Datum).
+3. „Letzter Kontakt" war computed (MAX aus Anrufen + Comments) — User erwartet ein manuell setzbares Datum mit Datepicker.
+4. „Anzahl Kontakte" sollte trackbar sein (wie oft hat der User Kontakt gehabt), inkl. manueller Korrektur bei Fehlklicks.
+
+### Entscheidung
+
+1. **Direkt-Klick** für `EditableSelectCell` + `EditableComboboxCell` + `AnrufCell` (linker Klick auf Datum). Hover-Pencil-Pattern bleibt nur noch für Text-/Number-Cells, wo freie Eingabe nötig ist.
+2. **Row-Klick entfernt** in ContactTable. Chat-Panel öffnet nur noch via expliziten Klick auf die Notizen-Spalte (Sprechblasen-Icon).
+3. **`contacts.letzter_kontakt` (date)** als neue, manuell setzbare Spalte (Migration 010). MAX-Aggregation aus `useContacts` entfernt — Wert kommt direkt aus dieser Spalte. Tabelle rendert als `ClickableDateCell`.
+4. **`contacts.kontakt_count` (integer)** als Zähler (Migration 011). Inkrementiert im Frontend bei jedem Save mit Nicht-Null-Datum. Display als `CounterCell` mit Plus/Minus-Buttons für manuelle Korrekturen. Toast bei Counter-Updates unterdrückt, damit schnelles Klicken nicht zur Toast-Flut führt.
+
+### Begründung
+
+- **Direkt-Klick vs Hover-Pencil:** das 2-Sek-Hover-Pattern aus Schritt 3 (EditableCellShell) wurde für Felder mit freier Texteingabe entworfen, um versehentliches Aktivieren beim Lesen zu vermeiden. Bei diskreten Werten (Status, Dropdown, Datum) ist die Auswahl trivial reversibel — Direkt-Klick spart einen Schritt pro Edit. Text-Cells bleiben absichtlich beim Hover-Pencil-Pattern.
+- **Row-Klick entfernt:** Spec sagte „Klick auf Kontakt-Zeile öffnet Slide-In-Panel". Im realen Gebrauch öffnet das aber unerwünscht beim Lesen einer Zelle oder dem Versuch, eine andere Aktion auszulösen. Notizen-Spalte hat ein eindeutiges Icon — das reicht als Trigger.
+- **Manuelles `letzter_kontakt`** statt computed: Owner-Erwartung aus Excel-Workflow — das Datum ist eine Pflege-Information, kein Audit-Trail. MAX-Aggregation war meine Spec-Interpretation, nicht User-Anforderung. **Reversibel:** wenn später Automatik nötig, View einbauen, die `COALESCE(letzter_kontakt, MAX(...))` macht.
+- **`kontakt_count` mit Counter-Cell:** simpler Integer, Frontend-Increment (Race-Conditions bei Single-User irrelevant). Plus/Minus-Buttons erlauben Korrektur ohne Edit-Modal. Toast unterdrückt — Counter-Update ist low-stakes Feedback, die Zahl selbst ist das Feedback.
+
+**Verworfen:**
+- View `contacts_aggregated` mit COALESCE — YAGNI für Single-User
+- Separate `contact_check_ins`-Tabelle mit Historie — Spec verlangt nur Count, nicht Historie. Wenn Historie später nötig, ist die Migration einfach: Counter durch Historie + `COUNT(*)`-Aggregation ersetzen, Hook-Interface bleibt gleich.
+
+### Konsequenzen
+
+- **Migration 010:** `ALTER TABLE contacts ADD COLUMN letzter_kontakt date NULL`
+- **Migration 011:** `ALTER TABLE contacts ADD COLUMN kontakt_count integer NOT NULL DEFAULT 0`
+- **Bestehende RLS-Policies decken die neuen Spalten automatisch ab** (`anon_update_contacts` aus Migration 004 — UPDATE auf allen Spalten erlaubt solange `deleted_at IS NULL`)
+- **`useContacts` vereinfacht:** statt 3-fach-Aggregation jetzt nur `dealsCount` + `commentsCount` clientseitig, `last_contact` direkt aus contact-row. ADR-014 bleibt für die counts gültig.
+- **`useUpdateContactField.FieldValue`** akzeptiert jetzt `string | ContactStatus | number | null`
+- **Neue Komponenten:** `src/components/crm/CounterCell.tsx`
+- **Gelöscht:** `EditableDateCell.tsx` (unused)
+
+### Folge-Items
+- Wenn Owner später automatisches Update von `letzter_kontakt` bei neuem Anruf/Comment will: View `contacts_with_last_contact` mit `COALESCE`-Logik einführen, useContacts auf View umstellen.
+- Wenn `kontakt_count` Multi-User-tauglich werden muss: SQL-Function `increment_kontakt_count(uuid)` mit atomic +1.
+
+---
+
 ## ADR-013 — Schritt 5 (PDF-Drag-Drop) nicht gebaut
 
 - **Datum:** 2026-05-12
