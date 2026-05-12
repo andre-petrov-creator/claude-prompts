@@ -22,11 +22,18 @@ Wenn `modul_2.rnd_frozen !== true` → STOPP: `"Modul 3: Modul 2 nicht abgeschlo
 
 ## 2. Inputs erheben
 
-**2a) Vorab-Verifikation Brutto/Netto-Konvention (einmalig, dokumentiert in `docs/excel_handoff.md`):**
+**2a) Brutto/Netto-Konvention (VERBINDLICH):**
 
-Vor dem ersten Modul-3-Live-Lauf prüfen: Rechnet Excel `RENO`-Sheet USt 19 % auf alle Reno-Kosten-Zellen? Wenn ja → Modul liefert **netto**. Wenn nein → Modul liefert **brutto**.
+Modul 3 liefert **immer Netto-Werte** in `modul_3.massnahmen_liste[].kosten_netto_eur` sowie `modul_3.rnd_gutachten_netto_eur` und `modul_3.weg_teilung_netto_eur`. Die Excel `RENO`-Tabelle rechnet die 19 % USt automatisch via `RENO!I7 = 0.19` auf alle Positionen hoch — Modul 3 muss nichts brutto liefern.
 
-**Aktuelle Annahme:** Modul liefert **netto** in `kosten_netto_eur` + Summen, plus zusätzlich `summen.modernisierung_brutto_eur` (= Netto × 1.19) für Vorlage-Robustheit. Status der Verifikation in `docs/excel_handoff.md`-Sektion „Brutto/Netto-Konvention" dokumentieren.
+**Wenn der User einen Brutto-Preis nennt** (z.B. „Gutachter kostet 1.190 € brutto/WE" oder „WEG-Teilung 17.850 € brutto"): vor dem State-Write **rückrechnen**:
+```
+kosten_netto_eur = kosten_brutto_eur / 1.19
+```
+
+Konkrete Default-Annahmen:
+- **RND-Gutachten:** 1.000 €/WE **netto** (entspricht ~1.190 € brutto/WE; im alten XML stand „1.000 €/WE", konsistent als Netto übernehmen).
+- **WEG-Teilung:** Excel-Template Default `RENO!K104 = 12.000 €/Stk netto`. Wenn User abweicht, immer netto liefern.
 
 **2b) Massnahmen pro Kategorie abfragen (eine `AskUserQuestion` pro Kategorie):**
 

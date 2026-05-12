@@ -90,18 +90,19 @@ PDF-Pfad: `runs/<slug>/Aufteiler_<Straßenkurz>_<YYYY-MM-DD>.pdf` (Straßenkurz 
 
 PDF-Build via `python -c` oder `python skripts/build_pdf_modul5.py runs/<slug>/state.json` (Skript optional, falls Skill-Inline-Build unhandlich wird; in Phase 4 zunächst inline).
 
-**3c) Excel-Befüllung:**
+**3c) Excel-Befüllung (gemäß `docs/excel_handoff.md`):**
 
-Excel-Template `template/Kalkulation_Aufteiler_mit_VK_CF.xlsx` (Binary) wird zu `runs/<slug>/Kalkulation_<Straßenkurz>.xlsx` kopiert. Werte aus `state.json` werden via **openpyxl** gemäß `docs/excel_handoff.md` in die Zellen geschrieben:
+Excel-Template `template/Kalkulation_Aufteiler_mit_VK_CF.xlsx` wird zu `runs/<slug>/Kalkulation_<Straßenkurz>.xlsx` kopiert. Schreib-Reihenfolge:
 
 ```python
 from openpyxl import load_workbook
+from openpyxl.comments import Comment
 import shutil, json
 from pathlib import Path
 
 state = json.load(open(state_path, encoding="utf-8"))
 slug = state["objekt"]["slug"]
-strasse_kurz = "-".join(slug.split("-")[:2])   # z.B. "prosperstr-59"
+strasse_kurz = "-".join(slug.split("-")[:2])  # z.B. "prosperstr-59"
 
 src = Path("template/Kalkulation_Aufteiler_mit_VK_CF.xlsx")
 dst = Path(f"runs/{slug}/Kalkulation_{strasse_kurz}.xlsx")
@@ -109,52 +110,150 @@ shutil.copyfile(src, dst)
 
 wb = load_workbook(dst)
 
-# Modul 1 -> MIETER A8:I<7+N> + KALKU C20, C23
+# ===== 1. BESICHTIGUNG (Eingabe-Maske; KALKU/VK_CF zieht sich daraus) =====
+besichtigung = wb["BESICHTIGUNG"]
+besichtigung["B6"]  = state["objekt"]["adresse"]
+besichtigung["B7"]  = sum(we["wohnflaeche_qm"] for we in state["modul_1"]["we_liste"])
+besichtigung["B8"]  = state["modul_2"]["baujahr"]
+besichtigung["B9"]  = len(state["modul_1"]["we_liste"])
+besichtigung["B13"] = state["modul_0"]["angebotspreis_eur"]
+besichtigung["B34"] = 0.15  # NRW-Default Kappungsgrenze
+
+# ===== 2. MIETER (WE-Stamm aus M1, IST aus M4, Y aus M4) =====
+def etage_aus_lage(lage):
+    """'EG' -> 'EG', 'OG_links'/'OG_rechts' -> '1.OG' (default), 'DG_*' -> 'DG'.
+    Wenn '2.OG_*' im Lage-String: gibt '2.OG'. Heuristik."""
+    L = lage.lower()
+    if l := L.startswith("eg"):
+        return "EG"
+    if "dg" in L or "dachgeschoss" in L:
+        return "DG"
+    if "2.og" in L or "2_og" in L or "og2" in L:
+        return "2.OG"
+    if "og" in L:
+        return "1.OG"
+    return lage  # Fallback wie gegeben
+
+def lage_aus_lage(lage):
+    L = lage.lower()
+    if "links" in L:
+        return "links"
+    if "rechts" in L:
+        return "rechts"
+    return ""
+
 mieter = wb["MIETER"]
+N = len(state["modul_1"]["we_liste"])
 for i, we in enumerate(state["modul_1"]["we_liste"]):
     row = 8 + i
-    mieter[f"A{row}"] = we["we_nr"]
-    mieter[f"B{row}"] = we["lage_im_haus"]
+    mieter[f"A{row}"] = 1  # Haus-Nr (Single-Haus-MFH; bei Mehrhaus später anpassen)
+    mieter[f"B{row}"] = we["we_nr"]
+    mieter[f"C{row}"] = etage_aus_lage(we["lage_im_haus"])
+    mieter[f"D{row}"] = lage_aus_lage(we["lage_im_haus"])
+    mieter[f"E{row}"] = we["zimmer_anzahl"]
     mieter[f"F{row}"] = we["wohnflaeche_qm"]
-    mieter[f"G{row}"] = we["zimmer_anzahl"]
-    mieter[f"H{row}"] = "ja" if we["balkon"] else "nein"
-    mieter[f"I{row}"] = "ja" if we["keller"] else "nein"
+    # G..K leer (kein State-Feld)
+    miete = state["modul_4"]["we_mieten"][i]
+    mieter[f"J{row}"] = round(miete["ist_miete_eur_pro_qm"] * we["wohnflaeche_qm"], 2)
+    mieter[f"Y{row}"] = miete["mietspiegel_obergrenze_eur_pro_qm"]
 
-kalku = wb["KALKU"]
-kalku["C20"] = state["modul_1"]["brw_eur_pro_qm"]
-kalku["C23"] = state["modul_1"]["gebaeude_anteil_prozent"]
+# Mietspiegel-Mittelwert M6 (gewichtet)
+m6 = sum(w["sollmiete_eur_pro_qm"] * we["wohnflaeche_qm"]
+         for w, we in zip(state["modul_4"]["we_mieten"], state["modul_1"]["we_liste"])) \
+     / sum(we["wohnflaeche_qm"] for we in state["modul_1"]["we_liste"])
+mieter["M6"] = round(m6, 2)
+mieter["P6"] = 0.15
 
-# Modul 2 -> KALKU C26, C27, C28
-kalku["C26"] = state["modul_2"]["afa_empfehlung_prozent"]
-kalku["C27"] = state["modul_2"]["mod_score"]
-kalku["C28"] = state["modul_2"]["rnd_jahre"]
-
-# Modul 4 -> MIETER M6, P6, Y8:Y<7+N> + RENO!K105
-mieter["M6"] = sum(w["sollmiete_eur_pro_qm"] * we["wohnflaeche_qm"]
-                    for w, we in zip(state["modul_4"]["we_mieten"], state["modul_1"]["we_liste"])) \
-                / sum(we["wohnflaeche_qm"] for we in state["modul_1"]["we_liste"])
-mieter["P6"] = 0.15   # NRW-Default Kappungsgrenze
-for i, we in enumerate(state["modul_4"]["we_mieten"]):
-    mieter[f"Y{8+i}"] = we["mietspiegel_obergrenze_eur_pro_qm"]
-
+# ===== 3. RENO (Mengen aus M3, Pauschal-Werte für Subvention/WEG) =====
 reno = wb["RENO"]
-reno["K105"] = state["modul_4"]["mietsubventionen_summe_eur_pro_monat"]
-# Hinweis: K105 erwartet Pauschalpreis (siehe Modul 4 alt-XML); je nach Excel-Sheet evtl. ×12.
 
-# Modul 3 -> RENO Blöcke (Block-Adressen aus Excel-Template noch finalisieren)
-# Siehe docs/excel_handoff.md — TODO bis Brutto/Netto-Verifikation steht
+# WEG-Teilung: Zeile 104
+if state["modul_3"]["weg_teilung_netto_eur"] > 0:
+    reno["I104"] = 1
+    # Default K104=12000 nicht überschreiben, ausser User wich ab
+    template_weg = 12000
+    if abs(state["modul_3"]["weg_teilung_netto_eur"] - template_weg) > 100:
+        reno["K104"] = state["modul_3"]["weg_teilung_netto_eur"]
+
+# Mietsubvention: Zeile 105 (Pauschalbetrag total über alle Stufen)
+# Aktuell im State: nur summe_eur_pro_monat (Durchschnitt). Total = pro_monat × reach_time
+# Vereinfacht: 5-Jahres-Default (60 Monate) falls reach_time nicht im State
+reach_time_default_mo = 60
+total_subv = state["modul_4"]["mietsubventionen_summe_eur_pro_monat"] * reach_time_default_mo
+reno["I105"] = 1
+reno["K105"] = round(total_subv, 2)
+
+# Massnahmen (Mengen-Mapper)
+KATEGORIE_RENO_MAPPING = {
+    "Dach":      [(25, "neu_decken", "dachflaeche")],   # Default: Dach neu decken
+    "Fassade":   [(18, "wdvs", "fassadenflaeche")],     # WDVS
+    "Fenster":   [(50, "komplett", "fenster_stk")],
+    "Heizung":   [(78, "zentral", "anzahl_we")],
+    "Elektrik":  [(69, "neu_pro_qm", "wohnflaeche_gesamt")],
+    "Sanitaer":  [(93, "bad_komplett", "wohnflaeche_gesamt")],
+    "Boeden":    [(37, "laminat", "wohnflaeche_gesamt")],
+    "Grundriss": [(30, "wand_einziehen", "anzahl_we")],
+}
+# Schätzungs-Heuristik für Menge falls nicht explizit aus State ableitbar
+wohnflaeche_gesamt = sum(we["wohnflaeche_qm"] for we in state["modul_1"]["we_liste"])
+dachflaeche = wohnflaeche_gesamt * 0.6        # Heuristik
+fassadenflaeche = wohnflaeche_gesamt * 0.8    # Heuristik
+fenster_pro_we = 6                              # Heuristik
+mengen_lookup = {
+    "wohnflaeche_gesamt": wohnflaeche_gesamt,
+    "dachflaeche": dachflaeche,
+    "fassadenflaeche": fassadenflaeche,
+    "fenster_stk": fenster_pro_we * len(state["modul_1"]["we_liste"]),
+    "anzahl_we": len(state["modul_1"]["we_liste"]),
+}
+
+for m in state["modul_3"]["massnahmen_liste"]:
+    kat = m["kategorie"]
+    if kat == "Sonstiges":
+        continue  # WEG/Subvention/RND-Gutachten separat behandelt
+    if kat not in KATEGORIE_RENO_MAPPING:
+        continue
+    for zeile, _, mengen_key in KATEGORIE_RENO_MAPPING[kat]:
+        # Wenn der Modul-3-Eintrag einen konkreten Netto-Wert hat, ggf. Default-K
+        # überschreiben (Vorsicht: nur wenn User explizit Preis pro Einheit kennt)
+        # Default-Verhalten: nur Menge eintragen, K (Preis pro Einheit) unverändert
+        menge = mengen_lookup.get(mengen_key, 1)
+        reno[f"I{zeile}"] = round(menge, 0)
+
+# ===== 4. Excel-Comments (Werte die nicht in dedizierte Zellen passen) =====
+kalku = wb["KALKU"]
+# AfA-Empfehlung als Comment auf KALKU!H10 (Headline VORKALKULATION)
+afa_text = (
+    f"Aufteiler-Skill Modul 2 RND/AfA:\n"
+    f"AfA-Empfehlung: {state['modul_2']['afa_empfehlung_prozent']:.2f}% (Korridor "
+    f"{state['modul_2']['afa_korridor_prozent']['min']:.2f}–{state['modul_2']['afa_korridor_prozent']['max']:.2f}%)\n"
+    f"RND: {state['modul_2']['rnd_jahre']} Jahre (rnd_frozen=true)\n"
+    f"Mod-Score: {state['modul_2']['mod_score']}/20\n"
+    f"BFH IX R 7/23: Gutachten zwingend, dies ist eine Vorprüfung."
+)
+kalku["H10"].comment = Comment(afa_text, "Aufteiler-Skill")
+
+# Bewertungs-Score als Comment auf BESICHTIGUNG!A40
+verdict_text = (
+    f"Aufteiler-Skill Modul 5 Deal-Bewertung:\n"
+    f"Score: {state['modul_5']['bewertungs_score']}/100 (Platzhalter-Logik)\n"
+    f"Status: {state['modul_5']['status'].upper()}\n"
+    f"PDF: {state['modul_5']['pdf_pfad']}"
+)
+besichtigung["A40"].comment = Comment(verdict_text, "Aufteiler-Skill")
+
+# Mietsubvention-Berechnungs-Verweis auf RENO!K105
+subv_text = (
+    f"Aufteiler-Skill Modul 4 Mietsubvention:\n"
+    f"Σ €/Monat (Durchschnitt über Reach-Time): "
+    f"{state['modul_4']['mietsubventionen_summe_eur_pro_monat']:.2f} EUR/Mo\n"
+    f"Gesamt-Pauschal (60-Mo-Default): {total_subv:.2f} EUR\n"
+    f"Stufen-Details siehe runs/<slug>/modul-4-output.md."
+)
+reno["K105"].comment = Comment(subv_text, "Aufteiler-Skill")
 
 wb.save(dst)
 ```
-
-**Excel-Comments** (Notiz-Zellen, KEINE Werte überschreiben):
-
-- `BESICHTIGUNG!A40` — 5-Zeilen-Verdict + Verhandlungsziel + Pflicht-Schritte
-- `BESICHTIGUNG!A41` — Modernisierungsstand-Zusammenfassung (aus `modul_3.massnahmen_liste`)
-- `KALKU H-Spalte unter Z40` — AfA-Begründung Substanz-Splitting + Käufer-ROI
-- `RENO Comment auf K105` — Mietsubvention Berechnungs-Verweis (Stufen aus `modul-4-output.md`)
-- `MIETER!U6` — Markt-Validation-Notiz (Quelle Immometrika/IS24, falls Tiefenstufe 6 erreicht)
-- `VK_CF Comment auf C9` — AfA Festlegung BFH-Argument (`modul_2.begruendung`)
 
 **3d) Plausibilitäts-Prüfung:**
 
