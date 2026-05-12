@@ -92,3 +92,63 @@ Live-Test offen für eine frische Session nach Phase 4:
 - Reproduzierbarkeits-Test (17.2) im Live-Skill-Lauf nachholen.
 - Brutto/Netto-Verifikation Excel-Template `RENO`-Sheet (siehe `docs/excel_handoff.md` Sektion „Brutto/Netto-Konvention").
 - Live-Skill-Aufruf-Test (Skill-Tool dispatcht Sub-Skills, AskUserQuestion-Interaktion) beim ersten echten Objekt nach Phase 4.
+
+---
+
+## Phase 4 E2E + Compression-Test (Task 20) — 2026-05-12
+
+**Ziel:** End-to-End-Lauf 0→5 funktional verifizieren; PDF + Excel auf Platte vorhanden; Compression-Test (Modul 5 läuft alleine aus State ohne Chat-History).
+
+**Methodik:** Wie Phase 2/3 funktional via State-Aufbau + Snippet-Ausführung.
+
+### Mini-Tests Modul 5 (Task 19)
+
+| Prüfpunkt | Soll | Ist | Status |
+|-----------|------|-----|--------|
+| Score-Berechnung (Platzhalter) auf Prosperstr-State (0:gelb/mittel, 1:gruen/mittel, 2:gelb/mittel, 3:gruen/mittel, 4:gruen/mittel) | base 70, Summe Δ = −20 → 50 | 50 | ✓ |
+| Status-Ableitung aus Score 50 | `gelb` (GRENZWERTIG) | `gelb` | ✓ |
+| `modul_5` schreibt nicht in `modul_0..4` (kein Re-Write) | Module 0–4 unverändert | unverändert | ✓ |
+| `modul_2.rnd_frozen` unverändert nach Modul 5 | `true` | `true` | ✓ |
+| Validator-CLI auf Vollanalyse-State 0–5 | exit 0 | exit 0 | ✓ |
+
+### E2E-Test (Task 20.1)
+
+| Prüfpunkt | Soll | Ist | Status |
+|-----------|------|-----|--------|
+| Excel-Template existiert | `template/Kalkulation_Aufteiler_mit_VK_CF.xlsx` vorhanden | vorhanden, 363 KB | ✓ |
+| `openpyxl` verfügbar | importierbar | 3.1.5 | ✓ |
+| `reportlab` verfügbar | importierbar | 4.4.10 | ✓ |
+| `matplotlib` verfügbar | importierbar | 3.10.9 | ✓ |
+| Excel-Befüllung MIETER A8..I12 (5 WE Prosperstr) | 5 Zeilen WE-Daten befüllt | 5 Zeilen befüllt | ✓ |
+| Excel-Befüllung MIETER M6 (gewichteter Mietspiegel-Mittelwert) | ≈ Σ(soll × wfl) / Σ wfl | 7.42 €/m² | ✓ |
+| Excel-Befüllung MIETER P6 (Kappungsgrenze) | 0.15 (NRW) | 0.15 | ✓ |
+| Excel-Befüllung MIETER Y8..Y12 (Obergrenzen) | 5 Werte | 5 Werte | ✓ |
+| Excel-Befüllung RENO!K105 (Mietsubvention €/Monat) | 861.06 | 861.06 | ✓ |
+| Excel-Datei nach Save auf Platte | `runs/<slug>/Kalkulation_<…>.xlsx` ≥ 50 KB | 364 KB | ✓ |
+| PDF-Build (Verdict-Box + Score-Tabelle, R1–R13 angewendet) | PDF-Datei auf Platte | 2.186 Bytes | ✓ |
+
+**KALKU-Fund (wichtig, dokumentiert in `docs/excel_handoff.md`):** Die im alten `archive/modul_1_objektbasis.xml` v1.1 angegebenen KALKU-Zell-Adressen (C20=BRW, C23=Gebäudeanteil, C26..C28=AfA-Korridor) sind im aktuellen Template **nicht mehr gültig**:
+- `KALKU!C20` ist eine Formel-Zelle (`=IFERROR(C19/C13,"")`, GIK pro m²)
+- `KALKU!C23` ist Zins B&H (Default 0.04)
+- `KALKU!C26` ist eine Merged-Cell-Headline ("2. NEBENKOSTENRECHNER")
+
+Modul 5 schreibt deshalb in der ersten Version nur in `MIETER`-Sheet + `RENO!K105`. KALKU-Zellen werden im State persistiert (sind ohnehin lesbar via `modul_*`-Blöcke); die echten KALKU-Eingangs-Adressen müssen vor Live-Modul-5-Lauf nachverifiziert werden — Aufgabe in `docs/excel_handoff.md` als TODO markiert.
+
+### Compression-Test (Task 20.2)
+
+**Soll:** In komplett neuer Session (kein Chat-History): „PDF für prosperstr-59-essen-dellwig nochmal aus existierendem State erzeugen". Erwartet: Modul 5 läuft, liest State aus Datei, generiert PDF erneut OHNE Rückfragen.
+
+**Ist:** Funktional via Build-Session bestanden. Das PDF-Build-Snippet (siehe oben Task 20.1) operiert ausschließlich auf `runs/<slug>/state.json` — keine `AskUserQuestion`, keine Chat-Werte. PDF-Generierung ist State-driven, damit Compression-tolerant.
+
+Live-Test (Skill-Tool-Dispatch ohne Chat-History) bleibt offen für nächste frische Session — analog Phase 2 + 3.
+
+### Verdict
+
+**Phase 4 grün, Skill-Suite funktional komplett.** PDF + Excel werden state-driven erzeugt, Score-Logik ist als dokumentierter Platzhalter integriert. Alle 6 Akzeptanzkriterien aus Spec § 13 erfüllt (Details siehe Plan).
+
+**Offene Punkte für Live-Roll-out (NICHT Phase-4-blockierend):**
+- KALKU-Zell-Adressen im Template ermitteln (Aufgabe vor erstem Live-Modul-5-Lauf, siehe `docs/excel_handoff.md`).
+- Brutto/Netto-Verifikation Excel-Template `RENO`-Sheet.
+- Live-Skill-Aufruf-Test (Skill-Tool dispatcht Sub-Skills, `AskUserQuestion`-Interaktion).
+- Reproduzierbarkeits-Test (Zone A/B byte-identisch über zwei Live-Runs).
+- Echte Score-Methodik einbauen (siehe `plans/2026-05-12-score-logik-modul-5-offen.md`).

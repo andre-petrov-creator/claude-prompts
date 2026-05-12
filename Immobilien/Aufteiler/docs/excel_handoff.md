@@ -28,13 +28,24 @@ Konvention: `N` = `len(modul_1.we_liste)` (Anzahl WE). `i` = WE-Index 0..N-1. Ex
 
 ## Sheet `KALKU`
 
-| Sheet!Zelle | Inhalt | Quelle (Schema-Pfad) | Liefer-Modul |
-|-------------|--------|----------------------|--------------|
-| `KALKU!C20` | Bodenrichtwert €/m² | `modul_1.brw_eur_pro_qm` | Modul 1 |
-| `KALKU!C23` | Gebäudeanteil % | `modul_1.gebaeude_anteil_prozent` | Modul 1 |
-| `KALKU!C26` | AfA-Empfehlung % (Mitte des Korridors) | `modul_2.afa_empfehlung_prozent` | Modul 2 |
-| `KALKU!C27` | Modernisierungs-Score | `modul_2.mod_score` | Modul 2 |
-| `KALKU!C28` | RND Jahre | `modul_2.rnd_jahre` | Modul 2 |
+**Achtung — Zell-Adressen-Verifikation TODO (2026-05-12):**
+
+Inspektion des echten Templates `template/Kalkulation_Aufteiler_mit_VK_CF.xlsx` ergab:
+- `KALKU!C20` ist im Template eine **Formel-Zelle** (`=IFERROR(C19/C13,"")` — GIK pro m²), KEIN BRW-Eingangs-Feld.
+- `KALKU!C23` ist **Zins B&H** (Default 0.04), KEIN Gebäudeanteil.
+- `KALKU!C26` ist ein **Merged-Cell-Header** ("2. NEBENKOSTENRECHNER"), nicht schreibbar.
+
+Die im alten `archive/modul_1_objektbasis.xml` v1.1 dokumentierten Zell-Adressen (C20/C21/C22/C23 für BRW/Bodenwert/Gebäude-KP/Gebäudeanteil) sind in der aktuellen Template-Version **nicht mehr gültig**.
+
+**Aufgabe vor Modul-5-Live-Lauf:** Korrekte Eingangs-Zellen im Template ermitteln (vermutlich in einem separaten KALKU-Block unterhalb oder in einem dedizierten Sheet wie `BESICHTIGUNG`). Bis Verifikation: Modul 5 schreibt KALKU-Werte NICHT, sondern legt sie nur als Excel-Comments / Notiz-Zellen ab. Modul-5-State enthält die Werte (`modul_1.brw_eur_pro_qm` etc.) ohnehin im JSON.
+
+| Sheet!Zelle | Inhalt | Quelle (Schema-Pfad) | Liefer-Modul | Status |
+|-------------|--------|----------------------|--------------|--------|
+| `KALKU!?` | Bodenrichtwert €/m² | `modul_1.brw_eur_pro_qm` | Modul 5 (in Modul-1-State persistiert) | TODO Zell-Adresse |
+| `KALKU!?` | Gebäudeanteil % | `modul_1.gebaeude_anteil_prozent` | Modul 5 | TODO Zell-Adresse |
+| `KALKU!?` | AfA-Empfehlung % | `modul_2.afa_empfehlung_prozent` | Modul 5 | TODO Zell-Adresse |
+| `KALKU!?` | Modernisierungs-Score | `modul_2.mod_score` | Modul 5 | TODO Zell-Adresse |
+| `KALKU!?` | RND Jahre | `modul_2.rnd_jahre` | Modul 5 | TODO Zell-Adresse |
 
 ## Sheet `RENO`
 
