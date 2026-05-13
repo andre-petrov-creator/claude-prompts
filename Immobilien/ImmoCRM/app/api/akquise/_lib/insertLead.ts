@@ -32,24 +32,40 @@ export interface InsertLeadResult {
 export async function insertLead(input: InsertLeadInput): Promise<InsertLeadResult> {
   const supa = supabaseAdmin();
 
-  const nameTail = input.contact.name.split(/\s+/).pop() || input.contact.name;
-  const { data: existing } = await supa
-    .from('contacts')
-    .select('id, email, name, phone, company')
-    .or(`email.eq.${input.contact.email},name.ilike.%${nameTail}%`)
-    .is('deleted_at', null)
-    .limit(20);
+  if (!input.contact.email) {
+    throw new Error('insertLead: contact.email is empty — cannot match or insert without an email');
+  }
+
+  // Zwei getrennte Lookup-Queries statt .or() mit String-Konkatenation.
+  // Grund: PostgREST .or() mit user-controllable Input (name aus Mail-Header) ist anfällig
+  // für Filter-Injection durch Sonderzeichen.
+  const nameTail = (input.contact.name.split(/\s+/).pop() || input.contact.name).replace(/[,()%*]/g, '');
+
+  const [byEmail, byName] = await Promise.all([
+    supa.from('contacts').select('id, email, name, phone, company').eq('email', input.contact.email).is('deleted_at', null).limit(5),
+    nameTail.length >= 3
+      ? supa.from('contacts').select('id, email, name, phone, company').ilike('name', `%${nameTail}%`).is('deleted_at', null).limit(20)
+      : Promise.resolve({ data: [] as Array<{ id: string; email: string | null; name: string; phone: string | null; company: string | null }> }),
+  ]);
+
+  const seen = new Set<string>();
+  const existing: Array<{ id: string; email: string | null; name: string; phone: string | null; company: string | null }> = [];
+  for (const row of [...(byEmail.data || []), ...(byName.data || [])]) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    existing.push(row);
+  }
 
   const match = classifyMatch({
     newContact: { email: input.contact.email, name: input.contact.name },
-    existing: existing?.map((e) => ({ email: e.email || '', name: e.name })) || [],
+    existing: existing.map((e) => ({ email: e.email || '', name: e.name })),
   });
 
   let contactId: string;
   let warning: string | null = null;
 
   if (match.kind === 'hard') {
-    const matched = existing![match.existingIndex];
+    const matched = existing[match.existingIndex];
     contactId = matched.id;
     const updates: ContactUpdate = {};
     if (!matched.phone && input.contact.phone) updates.phone = input.contact.phone;
@@ -58,7 +74,7 @@ export async function insertLead(input: InsertLeadInput): Promise<InsertLeadResu
       await supa.from('contacts').update(updates).eq('id', contactId);
     }
   } else if (match.kind === 'soft') {
-    const matchedSoft = existing![match.existingIndex];
+    const matchedSoft = existing[match.existingIndex];
     const inserted = await supa
       .from('contacts')
       .insert({
@@ -71,7 +87,10 @@ export async function insertLead(input: InsertLeadInput): Promise<InsertLeadResu
       })
       .select('id')
       .single();
-    contactId = inserted.data!.id;
+    if (!inserted.data) {
+      throw new Error(`contact insert failed (soft-match path): ${inserted.error?.message}`);
+    }
+    contactId = inserted.data.id;
     warning = `Duplikat-Verdacht: ähnlicher Name wie ${matchedSoft.name} (${matchedSoft.email})`;
     await supa.from('contact_comments').insert({
       contact_id: contactId,
@@ -90,7 +109,10 @@ export async function insertLead(input: InsertLeadInput): Promise<InsertLeadResu
       })
       .select('id')
       .single();
-    contactId = inserted.data!.id;
+    if (!inserted.data) {
+      throw new Error(`contact insert failed (no-match path): ${inserted.error?.message}`);
+    }
+    contactId = inserted.data.id;
   }
 
   const grouping = await groupForExistingDeal({
@@ -134,8 +156,10 @@ export async function insertLead(input: InsertLeadInput): Promise<InsertLeadResu
     })
     .select('id')
     .single();
-
-  const dealId = inserted.data!.id;
+  if (!inserted.data) {
+    throw new Error(`deal insert failed: ${inserted.error?.message}`);
+  }
+  const dealId = inserted.data.id;
 
   await supa.from('activity_log').insert({
     contact_id: contactId,
