@@ -50,3 +50,11 @@ export function getMailbox(): string {
   }
   return mailbox;
 }
+
+export function getLocalPathPrefix(): string {
+  const prefix = process.env.ONEDRIVE_LOCAL_PATH_PREFIX;
+  if (!prefix) {
+    throw new Error('ONEDRIVE_LOCAL_PATH_PREFIX not set');
+  }
+  return prefix;
+}

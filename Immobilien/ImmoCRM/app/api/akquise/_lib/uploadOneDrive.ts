@@ -1,5 +1,7 @@
-import { graphClient, getMailbox } from './msGraphClient';
+import { graphClient, getMailbox, getLocalPathPrefix } from './msGraphClient';
 
+// BASE muss als Ordnerkette im OneDrive-Mailbox-Drive bereits existieren.
+// Pipeline legt nur den objektspezifischen Unterordner an, nicht die Basis-Hierarchie.
 const BASE = process.env.ONEDRIVE_BASE_PATH || '/Immobilien/001_AQUISE/Objekte';
 
 export interface UploadInput {
@@ -63,7 +65,7 @@ export async function uploadFiles(input: UploadInput): Promise<UploadResult> {
   return {
     folderPath: folderUrl,
     webUrl: folderItem.webUrl,
-    localPath: `${process.env.ONEDRIVE_LOCAL_PATH_PREFIX}\\${folder}`,
+    localPath: `${getLocalPathPrefix()}\\${folder}`,
     uploadedFiles: uploaded,
   };
 }
