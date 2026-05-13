@@ -1,3 +1,20 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/" }],
+  "functions": {
+    "app/api/akquise/webhook/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/akquise/process/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/renew-subscription/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/renew-subscription",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }
