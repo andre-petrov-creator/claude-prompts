@@ -60,4 +60,5 @@ Desktop.ini
 
 # Spike-Artefakte (temporaer, siehe scripts/SPIKE-ANLEITUNG.md)
 scripts/spike-*.mjs
+scripts/smoke-*.mjs
 scripts/SPIKE-ANLEITUNG.md
