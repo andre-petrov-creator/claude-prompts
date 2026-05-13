@@ -1,18 +1,20 @@
 import type { DealStatus, ContactStatus } from "@/types/domain"
 
 export const STATUS_LABELS: Record<DealStatus, string> = {
+  pre_screened: "Pre-Screened",
   offen: "Offen",
   berechnet: "Berechnet",
   absage: "Absage",
 }
 
 export const STATUS_COLORS: Record<DealStatus, string> = {
+  pre_screened: "bg-purple-100 text-purple-800 border-purple-300",
   offen: "bg-orange-100 text-orange-800 border-orange-200",
   berechnet: "bg-green-100 text-green-800 border-green-200",
   absage: "bg-red-100 text-red-800 border-red-200",
 }
 
-export const SECTION_ORDER: DealStatus[] = ["berechnet", "offen", "absage"]
+export const SECTION_ORDER: DealStatus[] = ["pre_screened", "berechnet", "offen", "absage"]
 
 export const CONTACT_STATUS_LABELS: Record<ContactStatus, string> = {
   kalt: "Kalt",

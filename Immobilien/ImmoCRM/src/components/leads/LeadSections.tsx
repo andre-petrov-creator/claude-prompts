@@ -32,6 +32,7 @@ export default function LeadSections({
   contactFilter,
 }: Props) {
   const rowsByStatus: Record<DealStatus, Row<LeadRow>[]> = {
+    pre_screened: [],
     offen: [],
     berechnet: [],
     absage: [],
@@ -49,7 +50,7 @@ export default function LeadSections({
     } catch {
       // ignore
     }
-    return { berechnet: true, offen: true, absage: false }
+    return { pre_screened: true, berechnet: true, offen: true, absage: false }
   })
 
   useEffect(() => {
