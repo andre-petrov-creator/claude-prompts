@@ -15,6 +15,10 @@ export type LeadRow = DealWithFollowup & {
     "id" | "name" | "email" | "phone" | "company" | "position" | "lead_source"
   >
   notes_count: number
+  priority_score: number | null
+  priority_reason: string | null
+  workspace_path: string | null
+  expose_source: string | null
 }
 
 export type ContactRow = Contact & {
