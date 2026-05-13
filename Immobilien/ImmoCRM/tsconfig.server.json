@@ -14,7 +14,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
-  "include": ["app/**/*.ts"]
+  "include": ["app/**/*.ts", "src/lib/supabaseAdmin.ts", "src/types/supabase.ts"]
 }
