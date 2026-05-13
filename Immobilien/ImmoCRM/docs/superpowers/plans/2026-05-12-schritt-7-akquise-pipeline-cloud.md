@@ -2116,80 +2116,76 @@ git commit -m "feat(crm): pre_screened-status + score-spalte + workspace-pfad-bu
 ## Task 7l: Graph-Subscription registrieren + automatisierung-aquise deprecaten
 
 **Files:**
-- Create: `scripts/create-graph-subscription.mjs` (einmaliges Setup-Skript, nicht committed)
+- Create: `scripts/setup-graph-subscription.mjs` (einmaliges Setup-Skript, gitignored über `scripts/setup-*.mjs`)
 - Modify: `../automatisierung-aquise/README.md` (Deprecation-Banner)
 - Modify: `c:/meine-projekte/README.md` (Mono-Repo-Index)
 
-- [ ] **Step 1: Subscription-Setup-Skript schreiben**
+- [ ] **Step 0: Branch nach GitHub pushen für Vercel-Deploy**
 
-```javascript
-// scripts/create-graph-subscription.mjs (gitignored)
-import 'dotenv/config';
-import { ConfidentialClientApplication } from '@azure/msal-node';
-
-const app = new ConfidentialClientApplication({
-  auth: {
-    clientId: process.env.MS_GRAPH_CLIENT_ID,
-    clientSecret: process.env.MS_GRAPH_CLIENT_SECRET,
-    authority: `https://login.microsoftonline.com/${process.env.MS_GRAPH_TENANT_ID}`,
-  },
-});
-
-const tokenResp = await app.acquireTokenByRefreshToken({
-  refreshToken: process.env.MS_GRAPH_REFRESH_TOKEN,
-  scopes: ['Mail.Read', 'Files.ReadWrite.All', 'offline_access'],
-});
-
-const mailbox = process.env.MS_GRAPH_MAILBOX_EMAIL;
-const folderName = 'CRM-Eingang';
-
-// 1. Folder-ID lookup
-const foldersRes = await fetch(`https://graph.microsoft.com/v1.0/users/${mailbox}/mailFolders?$filter=displayName eq '${folderName}'`, {
-  headers: { Authorization: `Bearer ${tokenResp.accessToken}` },
-});
-const folders = (await foldersRes.json()).value;
-if (!folders.length) throw new Error(`Ordner '${folderName}' nicht gefunden`);
-const folderId = folders[0].id;
-console.log('Folder-ID:', folderId);
-
-// 2. Subscription erstellen
-const expiry = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
-const subRes = await fetch('https://graph.microsoft.com/v1.0/subscriptions', {
-  method: 'POST',
-  headers: {
-    Authorization: `Bearer ${tokenResp.accessToken}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    changeType: 'created',
-    notificationUrl: 'https://immo-crm-xi.vercel.app/api/akquise/webhook',
-    resource: `/users/${mailbox}/mailFolders('${folderId}')/messages`,
-    expirationDateTime: expiry,
-    clientState: process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE,
-  }),
-});
-const sub = await subRes.json();
-console.log('Subscription:', sub);
-if (!sub.id) throw new Error('Subscription-Anlage fehlgeschlagen: ' + JSON.stringify(sub));
-console.log('OK — Subscription-ID:', sub.id, 'Expires:', sub.expirationDateTime);
+```powershell
+cd c:/meine-projekte
+git push -u origin feat/schritt-7-akquise-pipeline
 ```
+
+Vercel-GitHub-Integration deployt automatisch eine Preview-URL. Aus dem Vercel-Dashboard die Preview-URL kopieren (Format: `https://<projekt>-<hash>-<user>.vercel.app`).
+
+- [ ] **Step 0a: Vercel-Env-Vars setzen**
+
+Im Vercel-Dashboard → Projekt ImmoCRM → Settings → Environment Variables alle Variablen aus `.env.example`-Akquise-Block setzen (auch für Preview-Environment, nicht nur Production):
+
+- `MS_GRAPH_CLIENT_ID`
+- `MS_GRAPH_CLIENT_SECRET`
+- `MS_GRAPH_TENANT_ID`
+- `MS_GRAPH_MAILBOX_EMAIL` = `appv@appv7878.onmicrosoft.com`
+- `MS_GRAPH_WEBHOOK_CLIENT_STATE` (zufälliger 64-Zeichen-String aus .env.local kopieren)
+- `ONEDRIVE_BASE_PATH` = `/Immobilien/001_AQUISE/Objekte`
+- `ONEDRIVE_LOCAL_PATH_PREFIX` (Windows-Pfad aus .env.local)
+- `SUPABASE_SERVICE_ROLE_KEY` (aus Supabase-Dashboard → Project Settings → API → service_role key)
+- `ANTHROPIC_API_KEY`
+
+Werte aus `.env.local` per Copy-Paste übernehmen (Werte erscheinen NICHT in Logs).
+
+- [ ] **Step 0b: Re-Deploy auslösen**
+
+Nach Setzen der Env-Vars im Vercel-Dashboard: "Redeploy" auf den Preview-Build klicken, damit die neuen Variablen geladen werden.
+
+- [ ] **Step 1: Subscription-Setup-Skript verfügbar machen**
+
+Datei `scripts/setup-graph-subscription.mjs` ist Teil des Repos (aber gitignored — sie wurde lokal angelegt und ist nicht in Git). Falls die Datei fehlt (z.B. nach `git clone`): aus der Doku im Task-7l-Section des Plans kopieren oder über Claude Code neu erzeugen lassen.
+
+Skript-Verhalten in 5 Stufen:
+1. App-Only-Token holen (Client-Credentials, KEIN OAuth-Refresh-Token)
+2. Folder-ID für `CRM-Eingang` per Graph-API lookup
+3. Webhook-URL probe (validationToken-Echo)
+4. Alte Subscriptions für dieselbe Notification-URL löschen
+5. Neue Subscription mit 2 Tagen Laufzeit erstellen
 
 - [ ] **Step 2: Vorbedingung — Vercel-Deployment muss live sein**
 
-Bevor das Skript läuft, muss `app/api/akquise/webhook/route.ts` auf https://immo-crm-xi.vercel.app deployed sein (sonst schlägt Graphs Validation-Call fehl).
+Bevor das Skript läuft, muss `app/api/akquise/webhook/route.ts` auf der Preview-URL deployed sein (sonst schlägt das interne Probe und Graphs Validation-Call fehl).
 
-`git push` → Vercel deployt → verifiziere mit curl:
+Verifiziere mit curl:
 ```powershell
-curl "https://immo-crm-xi.vercel.app/api/akquise/webhook?validationToken=test"
+curl "<vercel-preview-url>/api/akquise/webhook?validationToken=test"
 ```
 Expected: HTTP 200 mit Body `test`.
 
-- [ ] **Step 3: Subscription erstellen**
+- [ ] **Step 3: Subscription anlegen**
+
+Im ImmoCRM-Repo-Root, PowerShell:
 
 ```powershell
-node scripts/create-graph-subscription.mjs
+$env:WEBHOOK_BASE_URL = "<die-vercel-preview-url>"
+npx dotenv -e .env.local -- node scripts/setup-graph-subscription.mjs
 ```
-Expected: `OK — Subscription-ID: <uuid>`. Subscription-ID notieren.
+
+Skript prüft Webhook-Erreichbarkeit, löscht alte Subscriptions für dieselbe Webhook-URL, legt neue an. Output: Subscription-ID + Expiration-Date.
+
+Bei Fehler-Exit:
+- `2`: Token-Abruf fehlgeschlagen → .env.local Werte prüfen
+- `3-4`: Folder-Lookup fehlgeschlagen → CRM-Eingang-Ordner existiert nicht in `appv@`-Mailbox
+- `5`: Webhook-URL antwortet nicht → Preview-Deploy noch nicht fertig oder Env-Vars fehlen
+- `6`: Graph-API-Error → Body in Output lesen
 
 - [ ] **Step 4: Live-Test**
 
