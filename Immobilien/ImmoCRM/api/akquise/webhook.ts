@@ -86,18 +86,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       console.log('mail_queue insert OK', messageId);
 
-      const base = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : process.env.SITE_URL;
+      const base = process.env.SITE_URL
+        || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+      console.log('process-trigger base', base);
       if (base) {
-        void fetch(`${base}/api/akquise/process`, {
-          method: 'POST',
-          headers: {
-            authorization: `Bearer ${expectedClientState}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({ messageId, graphMessageId }),
-        }).catch((err) => console.error('process trigger failed', (err as Error)?.message));
+        try {
+          const procRes = await fetch(`${base}/api/akquise/process`, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${expectedClientState}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ messageId, graphMessageId }),
+          });
+          console.log('process-trigger response', procRes.status);
+        } catch (err) {
+          console.error('process trigger failed', (err as Error)?.message);
+        }
+      } else {
+        console.error('No base URL for process trigger');
       }
     }
 
