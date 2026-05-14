@@ -1,19 +1,18 @@
-function extractValidationToken(rawUrl: string | undefined): string | null {
-  if (!rawUrl) return null;
-  const m = rawUrl.match(/[?&]validationToken=([^&]+)/);
-  return m ? decodeURIComponent(m[1]) : null;
-}
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-export default async function handler(req: Request): Promise<Response> {
-  const validationToken = extractValidationToken(req.url);
+export default function handler(req: VercelRequest, res: VercelResponse) {
+  const validationToken = typeof req.query.validationToken === 'string'
+    ? req.query.validationToken
+    : Array.isArray(req.query.validationToken)
+      ? req.query.validationToken[0]
+      : undefined;
+
   if (validationToken) {
-    return new Response(validationToken, {
-      status: 200,
-      headers: { 'Content-Type': 'text/plain' },
-    });
+    res.setHeader('Content-Type', 'text/plain');
+    res.status(200).send(validationToken);
+    return;
   }
-  return new Response('OK', {
-    status: 200,
-    headers: { 'Content-Type': 'text/plain' },
-  });
+
+  res.setHeader('Content-Type', 'text/plain');
+  res.status(200).send('OK');
 }
