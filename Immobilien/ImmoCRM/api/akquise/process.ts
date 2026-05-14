@@ -1,27 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { fetchMail, fetchAttachments } from '../_lib/fetchMail.js';
 import { parseEmail } from '../_lib/parseEmail.js';
-import { classifyPdf, type PdfType } from '../_lib/classifyPdf.js';
-import { extractAddress } from '../_lib/extractAddress.js';
-import { extractContact } from '../_lib/extractContact.js';
-import { quickCheck } from '../_lib/quickCheck.js';
-import { uploadFiles } from '../_lib/uploadOneDrive.js';
-import { buildWorkspaceFiles } from '../_lib/writeWorkspace.js';
-import { insertLead } from '../_lib/insertLead.js';
 import { resolveLink } from '../_lib/resolveLink.js';
+import { uploadFiles } from '../_lib/uploadOneDrive.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
-import pdfParse from 'pdf-parse';
 
-interface ClassifiedFile {
-  name: string;
-  buffer: Buffer;
-  contentType: string;
-  type: PdfType;
-}
-
-async function extractPdfText(buffer: Buffer): Promise<string> {
-  const result = await pdfParse(buffer);
-  return result.text;
+function sanitizeMessageId(id: string): string {
+  return id.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 100);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -44,6 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(400).json({ error: 'messageId and graphMessageId required' });
     return;
   }
+
   const supa = supabaseAdmin();
 
   await supa
@@ -65,110 +51,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const allFiles = [...mail.attachments, ...linkAttachments];
 
-    let fullPdfText = '';
-    const classifiedFiles: ClassifiedFile[] = [];
-    for (const file of allFiles) {
-      if (file.contentType.includes('pdf')) {
-        try {
-          const text = await extractPdfText(file.buffer);
-          fullPdfText += `\n\n=== ${file.name} ===\n${text}`;
-          classifiedFiles.push({
-            ...file,
-            type: classifyPdf({ filename: file.name, text }),
-          });
-        } catch {
-          classifiedFiles.push({ ...file, type: 'sonstiges' });
-        }
-      } else {
-        classifiedFiles.push({ ...file, type: 'sonstiges' });
-      }
-    }
+    const inboxFolder = sanitizeMessageId(messageId);
 
-    const addressResult = await extractAddress({ text: mail.text, pdfText: fullPdfText });
-    const contact = extractContact(mail);
-    const qcResult = await quickCheck({
-      address: addressResult.address,
-      pdfText: fullPdfText,
-      mailText: mail.text,
-    });
+    const meta = {
+      messageId,
+      graphMessageId,
+      subject: mail.subject,
+      from: mail.from,
+      to: mail.to,
+      date: mail.date,
+      inReplyTo: mail.inReplyTo,
+      text: mail.text,
+      links: mail.links,
+      files: allFiles.map((f) => ({ name: f.name, size: f.buffer.length, contentType: f.contentType })),
+      schemaVersion: 1,
+    };
 
-    const address = addressResult.address || `_unbekannt_${Date.now()}`;
-
-    const workspaceFiles = buildWorkspaceFiles({
-      address,
-      score: qcResult.score,
-      reason: qcResult.reason,
-      kennzahlen: qcResult.kennzahlen,
-      quickCheckTranscript: qcResult.transcript,
-      pdfFiles: classifiedFiles.map((f) => f.name),
-    });
+    const trigger = {
+      messageId,
+      enqueuedAt: new Date().toISOString(),
+      schemaVersion: 1,
+    };
 
     const uploadInput = [
-      ...classifiedFiles.map((f) => ({ name: f.name, buffer: f.buffer, contentType: f.contentType })),
+      ...allFiles,
       {
         name: '_meta.json',
-        buffer: Buffer.from(
-          JSON.stringify(
-            {
-              messageId,
-              graphMessageId,
-              subject: mail.subject,
-              from: mail.from,
-              date: mail.date,
-              addressConfidence: addressResult.confidence,
-              addressSource: addressResult.source,
-              score: qcResult.score,
-              files: classifiedFiles.map((f) => ({ name: f.name, type: f.type, size: f.buffer.length })),
-            },
-            null,
-            2,
-          ),
-        ),
+        buffer: Buffer.from(JSON.stringify(meta, null, 2)),
         contentType: 'application/json',
       },
-      ...Object.entries(workspaceFiles).map(([name, content]) => ({
-        name,
-        buffer: Buffer.from(content),
-        contentType:
-          name.endsWith('.json') || name.endsWith('.code-workspace')
-            ? 'application/json'
-            : 'text/markdown',
-      })),
+      {
+        name: '.trigger',
+        buffer: Buffer.from(JSON.stringify(trigger, null, 2)),
+        contentType: 'application/json',
+      },
     ];
 
-    const upload = await uploadFiles({ addressFolder: address, files: uploadInput });
-
-    const exposeFile = classifiedFiles.find((f) => f.type === 'expose');
-    const lead = await insertLead({
-      contact,
-      deal: {
-        address: addressResult.address,
-        workspacePath: upload.localPath,
-        onedriveWebUrl: upload.webUrl,
-        expose_url: exposeFile ? `${upload.webUrl}/${exposeFile.name}` : null,
-        inboxMessageId: messageId,
-        inReplyTo: mail.inReplyTo,
-        priorityScore: qcResult.score,
-        priorityReason: qcResult.reason,
-        newFilenames: classifiedFiles.map((f) => f.name),
-      },
-    });
+    const upload = await uploadFiles({ folderName: inboxFolder, files: uploadInput });
 
     await supa
       .from('mail_queue')
       .update({
-        status: 'done',
-        done_at: new Date().toISOString(),
-        deal_id: lead.dealId,
+        status: 'ready_for_quickcheck',
+        done_at: null,
       })
       .eq('message_id', messageId);
 
     res.status(200).json({
       ok: true,
-      dealId: lead.dealId,
-      contactId: lead.contactId,
-      matchKind: lead.matchKind,
-      groupingKind: lead.groupingKind,
+      inboxFolder,
+      webUrl: upload.webUrl,
+      localPath: upload.localPath,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
