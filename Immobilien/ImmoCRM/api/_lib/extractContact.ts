@@ -1,5 +1,5 @@
-import type { ParsedEmail } from './parseEmail';
-import { detectPosition, type Position } from './positionHeuristic';
+import type { ParsedEmail } from './parseEmail.js';
+import { detectPosition, type Position } from './positionHeuristic.js';
 
 export interface ExtractedContact {
   name: string;

@@ -1,14 +1,14 @@
-import { fetchMail, fetchAttachments } from '../_lib/fetchMail';
-import { parseEmail } from '../_lib/parseEmail';
-import { classifyPdf, type PdfType } from '../_lib/classifyPdf';
-import { extractAddress } from '../_lib/extractAddress';
-import { extractContact } from '../_lib/extractContact';
-import { quickCheck } from '../_lib/quickCheck';
-import { uploadFiles } from '../_lib/uploadOneDrive';
-import { buildWorkspaceFiles } from '../_lib/writeWorkspace';
-import { insertLead } from '../_lib/insertLead';
-import { resolveLink } from '../_lib/resolveLink';
-import { supabaseAdmin } from '../../src/lib/supabaseAdmin';
+import { fetchMail, fetchAttachments } from '../_lib/fetchMail.js';
+import { parseEmail } from '../_lib/parseEmail.js';
+import { classifyPdf, type PdfType } from '../_lib/classifyPdf.js';
+import { extractAddress } from '../_lib/extractAddress.js';
+import { extractContact } from '../_lib/extractContact.js';
+import { quickCheck } from '../_lib/quickCheck.js';
+import { uploadFiles } from '../_lib/uploadOneDrive.js';
+import { buildWorkspaceFiles } from '../_lib/writeWorkspace.js';
+import { insertLead } from '../_lib/insertLead.js';
+import { resolveLink } from '../_lib/resolveLink.js';
+import { supabaseAdmin } from '../../src/lib/supabaseAdmin.js';
 import { PDFParse } from 'pdf-parse';
 
 interface ClassifiedFile {

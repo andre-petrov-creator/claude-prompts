@@ -1,4 +1,4 @@
-import { graphClient, getMailbox } from './msGraphClient';
+import { graphClient, getMailbox } from './msGraphClient.js';
 
 export interface GraphMail {
   id: string;

@@ -1,5 +1,5 @@
-import { fetchMail } from '../_lib/fetchMail';
-import { supabaseAdmin } from '../../src/lib/supabaseAdmin';
+import { fetchMail } from '../_lib/fetchMail.js';
+import { supabaseAdmin } from '../../src/lib/supabaseAdmin.js';
 
 export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);

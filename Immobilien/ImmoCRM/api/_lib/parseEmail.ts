@@ -1,4 +1,4 @@
-import type { GraphMail, GraphAttachment } from './fetchMail';
+import type { GraphMail, GraphAttachment } from './fetchMail.js';
 
 export interface ParsedEmail {
   messageId: string;

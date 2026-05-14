@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../../src/lib/supabaseAdmin';
+import { supabaseAdmin } from '../../src/lib/supabaseAdmin.js';
 
 export interface GroupingInput {
   address: string | null;

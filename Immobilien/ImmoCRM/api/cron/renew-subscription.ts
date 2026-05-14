@@ -1,4 +1,4 @@
-import { graphClient } from '../_lib/msGraphClient';
+import { graphClient } from '../_lib/msGraphClient.js';
 
 async function handle(req: Request) {
   const expected = process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE;

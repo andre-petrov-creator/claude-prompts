@@ -1,8 +1,8 @@
-import { supabaseAdmin } from '../../src/lib/supabaseAdmin';
-import type { Database } from '../../src/types/supabase';
-import type { ExtractedContact } from './extractContact';
-import { classifyMatch } from './duplicateMatch';
-import { groupForExistingDeal } from './groupMail';
+import { supabaseAdmin } from '../../src/lib/supabaseAdmin.js';
+import type { Database } from '../../src/types/supabase.js';
+import type { ExtractedContact } from './extractContact.js';
+import { classifyMatch } from './duplicateMatch.js';
+import { groupForExistingDeal } from './groupMail.js';
 
 type ContactUpdate = Database['public']['Tables']['contacts']['Update'];
 

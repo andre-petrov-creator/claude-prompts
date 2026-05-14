@@ -1,4 +1,4 @@
-import { graphClient, getMailbox, getLocalPathPrefix } from './msGraphClient';
+import { graphClient, getMailbox, getLocalPathPrefix } from './msGraphClient.js';
 
 // BASE muss als Ordnerkette im OneDrive-Mailbox-Drive bereits existieren.
 // Pipeline legt nur den objektspezifischen Unterordner an, nicht die Basis-Hierarchie.
