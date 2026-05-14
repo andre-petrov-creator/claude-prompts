@@ -1,9 +1,16 @@
 import { fetchMail } from '../_lib/fetchMail.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 
+function getValidationToken(rawUrl: string): string | null {
+  const qIdx = rawUrl.indexOf('?');
+  if (qIdx === -1) return null;
+  const query = rawUrl.slice(qIdx + 1);
+  const params = new URLSearchParams(query);
+  return params.get('validationToken');
+}
+
 export default async function handler(req: Request): Promise<Response> {
-  const url = new URL(req.url, 'http://localhost');
-  const validationToken = url.searchParams.get('validationToken');
+  const validationToken = getValidationToken(req.url || '');
   if (validationToken) {
     return new Response(validationToken, {
       status: 200,
