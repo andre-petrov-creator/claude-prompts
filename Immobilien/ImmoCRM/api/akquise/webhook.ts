@@ -18,77 +18,93 @@ function readValidationToken(req: VercelRequest): string | null {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const validationToken = readValidationToken(req);
-  if (validationToken) {
-    res.setHeader('Content-Type', 'text/plain');
-    res.status(200).send(validationToken);
-    return;
-  }
+  try {
+    console.log('webhook hit', { method: req.method, url: req.url });
 
-  if (req.method !== 'POST') {
-    res.setHeader('Content-Type', 'text/plain');
-    res.status(200).send('OK');
-    return;
-  }
-
-  const body = req.body as { value?: GraphNotification[] } | undefined;
-  if (!body || !Array.isArray(body.value)) {
-    res.status(400).json({ error: 'Invalid payload' });
-    return;
-  }
-
-  const expectedClientState = process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE;
-  if (!expectedClientState) {
-    res.status(500).json({ error: 'Server misconfigured' });
-    return;
-  }
-
-  const supa = supabaseAdmin();
-
-  for (const notification of body.value) {
-    if (notification.clientState !== expectedClientState) continue;
-    if (notification.changeType !== 'created') continue;
-
-    const graphMessageId = notification.resourceData?.id;
-    if (!graphMessageId) continue;
-
-    let mail;
-    try {
-      mail = await fetchMail(graphMessageId);
-    } catch (err) {
-      console.error('fetchMail failed', graphMessageId, (err as Error)?.message);
-      continue;
+    const validationToken = readValidationToken(req);
+    if (validationToken) {
+      console.log('returning validationToken', validationToken);
+      res.setHeader('Content-Type', 'text/plain');
+      res.status(200).send(validationToken);
+      return;
     }
 
-    const messageId = mail.internetMessageId;
-    if (!messageId) continue;
-
-    const { error } = await supa.from('mail_queue').insert({
-      message_id: messageId,
-      graph_message_id: graphMessageId,
-      status: 'pending',
-    });
-
-    if (error) {
-      if (error.code === '23505') continue;
-      console.error('mail_queue insert failed', error);
-      continue;
+    if (req.method !== 'POST') {
+      res.setHeader('Content-Type', 'text/plain');
+      res.status(200).send('OK');
+      return;
     }
 
-    const base = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.SITE_URL;
-    if (base) {
-      void fetch(`${base}/api/akquise/process`, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${expectedClientState}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({ messageId, graphMessageId }),
-      }).catch((err) => console.error('process trigger failed', (err as Error)?.message));
+    const body = req.body as { value?: GraphNotification[] } | undefined;
+    console.log('POST body keys', body ? Object.keys(body) : 'null', 'value-len', Array.isArray(body?.value) ? body.value.length : 'not-array');
+
+    if (!body || !Array.isArray(body.value)) {
+      res.status(400).json({ error: 'Invalid payload' });
+      return;
     }
+
+    const expectedClientState = process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE;
+    if (!expectedClientState) {
+      console.error('MS_GRAPH_WEBHOOK_CLIENT_STATE missing');
+      res.status(500).json({ error: 'Server misconfigured' });
+      return;
+    }
+
+    const supa = supabaseAdmin();
+
+    for (const notification of body.value) {
+      console.log('notification', { changeType: notification.changeType, hasResourceData: !!notification.resourceData, clientStateMatch: notification.clientState === expectedClientState });
+
+      if (notification.clientState !== expectedClientState) continue;
+      if (notification.changeType !== 'created') continue;
+
+      const graphMessageId = notification.resourceData?.id;
+      if (!graphMessageId) continue;
+
+      let mail;
+      try {
+        mail = await fetchMail(graphMessageId);
+      } catch (err) {
+        console.error('fetchMail failed', graphMessageId, (err as Error)?.message);
+        continue;
+      }
+
+      const messageId = mail.internetMessageId;
+      if (!messageId) continue;
+
+      const { error } = await supa.from('mail_queue').insert({
+        message_id: messageId,
+        graph_message_id: graphMessageId,
+        status: 'pending',
+      });
+
+      if (error) {
+        if (error.code === '23505') continue;
+        console.error('mail_queue insert failed', JSON.stringify(error));
+        continue;
+      }
+
+      console.log('mail_queue insert OK', messageId);
+
+      const base = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : process.env.SITE_URL;
+      if (base) {
+        void fetch(`${base}/api/akquise/process`, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${expectedClientState}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ messageId, graphMessageId }),
+        }).catch((err) => console.error('process trigger failed', (err as Error)?.message));
+      }
+    }
+
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    const e = err as Error;
+    console.error('webhook fatal', e?.message, e?.stack);
+    res.status(500).json({ error: e?.message || String(err) });
   }
-
-  res.status(200).json({ ok: true });
 }
