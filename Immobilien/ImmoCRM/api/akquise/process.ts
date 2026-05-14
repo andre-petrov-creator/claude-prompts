@@ -10,7 +10,7 @@ import { buildWorkspaceFiles } from '../_lib/writeWorkspace.js';
 import { insertLead } from '../_lib/insertLead.js';
 import { resolveLink } from '../_lib/resolveLink.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
-import { PDFParse } from 'pdf-parse';
+import pdfParse from 'pdf-parse';
 
 interface ClassifiedFile {
   name: string;
@@ -20,13 +20,8 @@ interface ClassifiedFile {
 }
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
-  const parser = new PDFParse({ data: new Uint8Array(buffer) });
-  try {
-    const result = await parser.getText();
-    return result.text;
-  } finally {
-    await parser.destroy();
-  }
+  const result = await pdfParse(buffer);
+  return result.text;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
