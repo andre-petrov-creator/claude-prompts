@@ -1,3 +1,13 @@
+> **⚠️ HISTORISCHE REFERENZ — ERSETZT.**
+> Diese Spec wurde am 2026-05-14 funktional ersetzt durch
+> [`2026-05-14-akquise-pipeline-redesign.md`](2026-05-14-akquise-pipeline-redesign.md).
+> Grund: PDF-Parsing in der Vercel-Node-Runtime nicht stabil (`pdf-parse` braucht
+> `DOMMatrix`, das nicht verfügbar ist). Quick-Check + Adress-Extraktion wurden
+> daher lokal auf den PC verlagert. Cloud bleibt als dummer Briefträger.
+> Webhook und Mail-Scraping-Logik aus dieser alten Spec bleiben jedoch im Einsatz.
+
+---
+
 # Akquise-Pipeline (Cloud) — Design
 
 **Status:** Spec (Phase: Brainstorming abgeschlossen, Implementierungsplan ausstehend)
