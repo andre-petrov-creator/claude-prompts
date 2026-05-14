@@ -1,15 +1,23 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { graphClient } from '../_lib/msGraphClient.js';
 
-async function handle(req: Request) {
-  const expected = process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE;
-  if (!expected) {
-    return new Response('Server misconfigured', { status: 500 });
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
+    return;
   }
 
-  const isVercelCron = req.headers.get('x-vercel-cron') !== null;
-  const hasBearer = req.headers.get('authorization') === `Bearer ${expected}`;
+  const expected = process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE;
+  if (!expected) {
+    res.status(500).send('Server misconfigured');
+    return;
+  }
+
+  const isVercelCron = typeof req.headers['x-vercel-cron'] === 'string';
+  const hasBearer = req.headers.authorization === `Bearer ${expected}`;
   if (!isVercelCron && !hasBearer) {
-    return new Response('Unauthorized', { status: 401 });
+    res.status(401).send('Unauthorized');
+    return;
   }
 
   const client = await graphClient();
@@ -25,12 +33,5 @@ async function handle(req: Request) {
     }
   }
 
-  return Response.json({ ok: true, renewed });
-}
-
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method === 'GET' || req.method === 'POST') {
-    return handle(req);
-  }
-  return new Response('Method Not Allowed', { status: 405 });
+  res.status(200).json({ ok: true, renewed });
 }

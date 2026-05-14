@@ -1,3 +1,4 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { fetchMail, fetchAttachments } from '../_lib/fetchMail.js';
 import { parseEmail } from '../_lib/parseEmail.js';
 import { classifyPdf, type PdfType } from '../_lib/classifyPdf.js';
@@ -28,20 +29,26 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   }
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
+    res.status(405).send('Method Not Allowed');
+    return;
   }
 
   const expected = process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE;
-  if (!expected || req.headers.get('authorization') !== `Bearer ${expected}`) {
-    return new Response('Unauthorized', { status: 401 });
+  if (!expected || req.headers.authorization !== `Bearer ${expected}`) {
+    res.status(401).send('Unauthorized');
+    return;
   }
 
-  const { messageId, graphMessageId } = (await req.json()) as {
-    messageId: string;
-    graphMessageId: string;
+  const { messageId, graphMessageId } = (req.body ?? {}) as {
+    messageId?: string;
+    graphMessageId?: string;
   };
+  if (!messageId || !graphMessageId) {
+    res.status(400).json({ error: 'messageId and graphMessageId required' });
+    return;
+  }
   const supa = supabaseAdmin();
 
   await supa
@@ -161,7 +168,7 @@ export default async function handler(req: Request): Promise<Response> {
       })
       .eq('message_id', messageId);
 
-    return Response.json({
+    res.status(200).json({
       ok: true,
       dealId: lead.dealId,
       contactId: lead.contactId,
@@ -174,6 +181,6 @@ export default async function handler(req: Request): Promise<Response> {
       .from('mail_queue')
       .update({ status: 'error', error_msg: msg })
       .eq('message_id', messageId);
-    return Response.json({ ok: false, error: msg }, { status: 500 });
+    res.status(500).json({ ok: false, error: msg });
   }
 }
