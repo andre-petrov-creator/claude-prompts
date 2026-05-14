@@ -52,7 +52,7 @@ export async function uploadFiles(input: UploadInput): Promise<UploadResult> {
           'Content-Length': String(file.buffer.length),
           'Content-Range': `bytes 0-${file.buffer.length - 1}/${file.buffer.length}`,
         },
-        body: file.buffer,
+        body: new Uint8Array(file.buffer),
       });
       if (!res.ok) throw new Error(`Upload-Session-PUT failed: ${res.status}`);
       const item = (await res.json()) as { id: string };

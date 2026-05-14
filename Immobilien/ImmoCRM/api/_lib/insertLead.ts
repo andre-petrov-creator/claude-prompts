@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './supabaseAdmin.js';
-import type { Database } from '../../src/types/supabase';
+import type { Database } from '../../src/types/supabase.js';
 import type { ExtractedContact } from './extractContact.js';
 import { classifyMatch } from './duplicateMatch.js';
 import { groupForExistingDeal } from './groupMail.js';
