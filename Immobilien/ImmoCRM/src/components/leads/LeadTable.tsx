@@ -9,6 +9,8 @@ import {
   type VisibilityState,
   type ColumnSizingState,
 } from "@tanstack/react-table"
+import { Copy } from "lucide-react"
+import { toast } from "sonner"
 import type { LeadRow, DealStatus } from "@/types/domain"
 import StatusBadge from "./StatusBadge"
 import LeadSections from "./LeadSections"
@@ -174,6 +176,57 @@ export default function LeadTable({
             }
           />
         ),
+      },
+      {
+        id: "priority_score",
+        header: "Score",
+        accessorKey: "priority_score",
+        size: 80,
+        cell: ({ row }) => {
+          const score = row.original.priority_score
+          if (score == null) return <span className="text-zinc-300">—</span>
+          const color =
+            score >= 70
+              ? "text-red-600 font-bold"
+              : score >= 40
+                ? "text-orange-500"
+                : "text-zinc-500"
+          return (
+            <span
+              className={cn("font-mono", color)}
+              title={row.original.priority_reason ?? undefined}
+            >
+              {score}
+            </span>
+          )
+        },
+      },
+      {
+        id: "workspace",
+        header: "Workspace",
+        size: 110,
+        cell: ({ row }) => {
+          const path = row.original.workspace_path
+          if (!path) return <span className="text-zinc-300">—</span>
+          return (
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation()
+                await navigator.clipboard.writeText(path)
+                toast.success("Workspace-Pfad kopiert", {
+                  description:
+                    "Win+E -> Strg+V -> Enter -> Doppelklick auf objekt.code-workspace",
+                })
+              }}
+              title={path}
+              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+            >
+              <Copy className="w-3 h-3" />
+              Pfad
+            </button>
+          )
+        },
       },
       {
         id: "name",

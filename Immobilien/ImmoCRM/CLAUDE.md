@@ -63,7 +63,7 @@ PDFs werden **nicht** gespeichert — nur Verweise (`expose_url`, `expose_local_
 
 ## Workflow-Integration
 
-Bestehender Cloud-Code-Workflow `Automation Akquise` wird um Subagent **"CRM Befüllen"** ergänzt (Schritt 7). Der Subagent schreibt nach erfolgreicher Kalkulation direkt via Supabase REST API ins CRM (Duplikat-Check Email + Name).
+**Akquise-Pipeline (Schritt 7, Cloud):** Mails landen via Outlook-QuickStep-Forward im M365-Postfach `appv@appv7878.onmicrosoft.com` Ordner `CRM-Eingang`. Microsoft Graph Webhook empfängt Notification in Echtzeit, Vercel-Edge-Function lädt die Mail, lädt PDFs nach OneDrive hoch, macht QuickCheck-Score und legt Pre-Screening-Lead im CRM an. Aufteiler bleibt unberührt — manueller Trigger via "Workspace-Pfad-kopieren"-Button im CRM. Details: `docs/superpowers/specs/2026-05-11-akquise-pipeline-cloud-design.md` und `docs/superpowers/plans/2026-05-12-schritt-7-akquise-pipeline-cloud.md`.
 
 ---
 

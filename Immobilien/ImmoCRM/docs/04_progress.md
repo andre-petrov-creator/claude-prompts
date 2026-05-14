@@ -57,6 +57,7 @@ Status pro Bauschritt aus [02_implementierungsplan.md](02_implementierungsplan.m
 ## Offene Punkte — am MVP-Ende abhaken
 
 - [ ] **Nachfass-Logik gegen Excel 1.2.1 prüfen** (Aufgenommen 2026-05-11). ADR-005 definiert: `offen` +5 Werktage, `berechnet` +14 Werktage, jeweils ab `MAX(angebot_datum, last_comment_date)`, mit NRW-Werktagslogik. Vor MVP-Done verifizieren, ob das Excel-Schema 1.2.1 die gleiche Logik (Offset-Tage, Basis-Datum, Werktagsregel) hat — sonst Schema in `compute_followup()` anpassen.
+- [ ] **Anzahl WE-Spalte im CRM hinzufügen** (Aufgenommen 2026-05-13, Side-Quest aus Schritt 7). `deals.wohneinheiten_count integer` (oder Reuse von vorhandener `einheiten`-Spalte falls schon da — prüfen!). Spalte in Lead-Tabelle hinter Objekt/Adresse einblenden. Wird auch von der Akquise-Pipeline befüllt (QuickCheck extrahiert WE-Zahl aus Exposé in `quickCheck.ts:extractKennzahlen`). Migration nach Abschluss Schritt 7.
 
 ## Update-Routine
 

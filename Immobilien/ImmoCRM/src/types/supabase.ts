@@ -193,8 +193,10 @@ export type Database = {
           deleted_at: string | null
           einheiten: number | null
           expose_local_path: string | null
+          expose_source: string
           expose_url: string | null
           id: string
+          inbox_message_id: string | null
           kalk_pro_m2: number | null
           kalk_verkaufspreis: number | null
           letzter_anruf: string | null
@@ -203,10 +205,13 @@ export type Database = {
           object_type: string | null
           preis_kauf: number | null
           preis_pro_m2: number | null
+          priority_reason: string | null
+          priority_score: number | null
           status: Database["public"]["Enums"]["deal_status"]
           updated_at: string
           verwendung: string | null
           wohnflaeche_m2: number | null
+          workspace_path: string | null
           zip: string | null
         }
         Insert: {
@@ -219,8 +224,10 @@ export type Database = {
           deleted_at?: string | null
           einheiten?: number | null
           expose_local_path?: string | null
+          expose_source?: string
           expose_url?: string | null
           id?: string
+          inbox_message_id?: string | null
           kalk_pro_m2?: number | null
           kalk_verkaufspreis?: number | null
           letzter_anruf?: string | null
@@ -229,10 +236,13 @@ export type Database = {
           object_type?: string | null
           preis_kauf?: number | null
           preis_pro_m2?: number | null
+          priority_reason?: string | null
+          priority_score?: number | null
           status?: Database["public"]["Enums"]["deal_status"]
           updated_at?: string
           verwendung?: string | null
           wohnflaeche_m2?: number | null
+          workspace_path?: string | null
           zip?: string | null
         }
         Update: {
@@ -245,8 +255,10 @@ export type Database = {
           deleted_at?: string | null
           einheiten?: number | null
           expose_local_path?: string | null
+          expose_source?: string
           expose_url?: string | null
           id?: string
+          inbox_message_id?: string | null
           kalk_pro_m2?: number | null
           kalk_verkaufspreis?: number | null
           letzter_anruf?: string | null
@@ -255,10 +267,13 @@ export type Database = {
           object_type?: string | null
           preis_kauf?: number | null
           preis_pro_m2?: number | null
+          priority_reason?: string | null
+          priority_score?: number | null
           status?: Database["public"]["Enums"]["deal_status"]
           updated_at?: string
           verwendung?: string | null
           wohnflaeche_m2?: number | null
+          workspace_path?: string | null
           zip?: string | null
         }
         Relationships: [
@@ -285,6 +300,54 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      mail_queue: {
+        Row: {
+          deal_id: string | null
+          done_at: string | null
+          enqueued_at: string
+          error_msg: string | null
+          graph_message_id: string | null
+          message_id: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          deal_id?: string | null
+          done_at?: string | null
+          enqueued_at?: string
+          error_msg?: string | null
+          graph_message_id?: string | null
+          message_id: string
+          started_at?: string | null
+          status: string
+        }
+        Update: {
+          deal_id?: string | null
+          done_at?: string | null
+          enqueued_at?: string
+          error_msg?: string | null
+          graph_message_id?: string | null
+          message_id?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_queue_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mail_queue_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals_with_followup"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -394,7 +457,7 @@ export type Database = {
     Enums: {
       activity_type: "new_lead" | "anruf" | "besichtigung" | "angebot"
       contact_status: "kalt" | "warm" | "heiß" | "nr1"
-      deal_status: "offen" | "berechnet" | "absage"
+      deal_status: "pre_screened" | "offen" | "berechnet" | "absage"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -524,7 +587,7 @@ export const Constants = {
     Enums: {
       activity_type: ["new_lead", "anruf", "besichtigung", "angebot"],
       contact_status: ["kalt", "warm", "heiß", "nr1"],
-      deal_status: ["offen", "berechnet", "absage"],
+      deal_status: ["pre_screened", "offen", "berechnet", "absage"],
     },
   },
 } as const
