@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyMatch } from '../../app/api/akquise/_lib/duplicateMatch';
+import { classifyMatch } from '../../api/_lib/duplicateMatch';
 
 describe('classifyMatch', () => {
   it('Hard-Match bei exakter Email', () => {

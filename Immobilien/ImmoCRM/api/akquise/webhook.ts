@@ -1,22 +1,7 @@
 import { fetchMail } from '../_lib/fetchMail';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { supabaseAdmin } from '../../src/lib/supabaseAdmin';
 
-export const runtime = 'nodejs';
-export const maxDuration = 30;
-
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const token = url.searchParams.get('validationToken');
-  if (token) {
-    return new Response(token, {
-      status: 200,
-      headers: { 'Content-Type': 'text/plain' },
-    });
-  }
-  return new Response('Missing validationToken', { status: 400 });
-}
-
-export async function POST(req: Request) {
+export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const validationToken = url.searchParams.get('validationToken');
   if (validationToken) {
@@ -24,6 +9,14 @@ export async function POST(req: Request) {
       status: 200,
       headers: { 'Content-Type': 'text/plain' },
     });
+  }
+
+  if (req.method === 'GET') {
+    return new Response('Missing validationToken', { status: 400 });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   interface GraphNotification {

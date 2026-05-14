@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildWorkspaceFiles } from '../../app/api/akquise/_lib/writeWorkspace';
+import { buildWorkspaceFiles } from '../../api/_lib/writeWorkspace';
 
 describe('buildWorkspaceFiles', () => {
   it('liefert alle 4 Dateien', () => {

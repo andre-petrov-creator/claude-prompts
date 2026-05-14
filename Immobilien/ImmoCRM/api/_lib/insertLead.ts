@@ -1,5 +1,5 @@
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import type { Database } from '@/types/supabase';
+import { supabaseAdmin } from '../../src/lib/supabaseAdmin';
+import type { Database } from '../../src/types/supabase';
 import type { ExtractedContact } from './extractContact';
 import { classifyMatch } from './duplicateMatch';
 import { groupForExistingDeal } from './groupMail';

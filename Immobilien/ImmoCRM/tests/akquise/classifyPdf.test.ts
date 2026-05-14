@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyPdf } from '../../app/api/akquise/_lib/classifyPdf';
+import { classifyPdf } from '../../api/_lib/classifyPdf';
 
 describe('classifyPdf', () => {
   it('erkennt Exposé per Filename mit/ohne Akzent', () => {

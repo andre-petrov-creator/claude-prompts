@@ -1,7 +1,4 @@
-import { graphClient } from '../../akquise/_lib/msGraphClient';
-
-export const runtime = 'nodejs';
-export const maxDuration = 30;
+import { graphClient } from '../_lib/msGraphClient';
 
 async function handle(req: Request) {
   const expected = process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE;
@@ -9,9 +6,6 @@ async function handle(req: Request) {
     return new Response('Server misconfigured', { status: 500 });
   }
 
-  // Akzeptiere zwei Auth-Pfade:
-  //  1. Vercel-Cron sendet x-vercel-cron-Header (kein Bearer-Token verfügbar)
-  //  2. Manueller Aufruf (z.B. Setup-Skript) sendet Bearer = MS_GRAPH_WEBHOOK_CLIENT_STATE
   const isVercelCron = req.headers.get('x-vercel-cron') !== null;
   const hasBearer = req.headers.get('authorization') === `Bearer ${expected}`;
   if (!isVercelCron && !hasBearer) {
@@ -34,10 +28,9 @@ async function handle(req: Request) {
   return Response.json({ ok: true, renewed });
 }
 
-export async function GET(req: Request) {
-  return handle(req);
-}
-
-export async function POST(req: Request) {
-  return handle(req);
+export default async function handler(req: Request): Promise<Response> {
+  if (req.method === 'GET' || req.method === 'POST') {
+    return handle(req);
+  }
+  return new Response('Method Not Allowed', { status: 405 });
 }

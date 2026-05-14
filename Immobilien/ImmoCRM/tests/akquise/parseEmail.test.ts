@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseEmail } from '../../app/api/akquise/_lib/parseEmail';
-import type { GraphMail, GraphAttachment } from '../../app/api/akquise/_lib/fetchMail';
+import { parseEmail } from '../../api/_lib/parseEmail';
+import type { GraphMail, GraphAttachment } from '../../api/_lib/fetchMail';
 
 const PDF_BASE64 = Buffer.from('%PDF-1.4 dummy content').toString('base64');
 

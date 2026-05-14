@@ -8,11 +8,8 @@ import { uploadFiles } from '../_lib/uploadOneDrive';
 import { buildWorkspaceFiles } from '../_lib/writeWorkspace';
 import { insertLead } from '../_lib/insertLead';
 import { resolveLink } from '../_lib/resolveLink';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { supabaseAdmin } from '../../src/lib/supabaseAdmin';
 import { PDFParse } from 'pdf-parse';
-
-export const runtime = 'nodejs';
-export const maxDuration = 60;
 
 interface ClassifiedFile {
   name: string;
@@ -31,7 +28,11 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   }
 }
 
-export async function POST(req: Request) {
+export default async function handler(req: Request): Promise<Response> {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
+  }
+
   const expected = process.env.MS_GRAPH_WEBHOOK_CLIENT_STATE;
   if (!expected || req.headers.get('authorization') !== `Bearer ${expected}`) {
     return new Response('Unauthorized', { status: 401 });

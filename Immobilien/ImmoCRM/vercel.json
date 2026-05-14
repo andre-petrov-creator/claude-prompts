@@ -1,13 +1,16 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/" }
+  ],
   "functions": {
-    "app/api/akquise/webhook/route.ts": {
+    "api/akquise/webhook.ts": {
       "maxDuration": 30
     },
-    "app/api/akquise/process/route.ts": {
+    "api/akquise/process.ts": {
       "maxDuration": 60
     },
-    "app/api/cron/renew-subscription/route.ts": {
+    "api/cron/renew-subscription.ts": {
       "maxDuration": 30
     }
   },

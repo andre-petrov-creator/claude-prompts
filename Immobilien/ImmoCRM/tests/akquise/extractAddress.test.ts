@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { extractAddress } from '../../app/api/akquise/_lib/extractAddress';
+import { extractAddress } from '../../api/_lib/extractAddress';
 
 describe('extractAddress', () => {
   afterEach(() => {

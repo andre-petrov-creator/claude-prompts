@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectPosition } from '../../app/api/akquise/_lib/positionHeuristic';
+import { detectPosition } from '../../api/_lib/positionHeuristic';
 
 describe('detectPosition', () => {
   it('Default = Makler bei neutraler Signatur', () => {

@@ -20,5 +20,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["app/**/*.ts", "src/lib/supabaseAdmin.ts", "src/types/supabase.ts"]
+  "include": ["api/**/*.ts", "src/lib/supabaseAdmin.ts", "src/types/supabase.ts"]
 }

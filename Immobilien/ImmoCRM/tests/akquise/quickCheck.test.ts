@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { quickCheck } from '../../app/api/akquise/_lib/quickCheck';
+import { quickCheck } from '../../api/_lib/quickCheck';
 
 describe('quickCheck', () => {
   afterEach(() => {
