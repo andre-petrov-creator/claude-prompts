@@ -8,7 +8,7 @@ import { uploadFiles } from '../_lib/uploadOneDrive.js';
 import { buildWorkspaceFiles } from '../_lib/writeWorkspace.js';
 import { insertLead } from '../_lib/insertLead.js';
 import { resolveLink } from '../_lib/resolveLink.js';
-import { supabaseAdmin } from '../../src/lib/supabaseAdmin.js';
+import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { PDFParse } from 'pdf-parse';
 
 interface ClassifiedFile {
