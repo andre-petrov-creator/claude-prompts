@@ -1,11 +1,11 @@
 import { graphClient, getMailbox, getLocalPathPrefix } from './msGraphClient.js';
 
 // BASE muss als Ordnerkette im OneDrive-Mailbox-Drive bereits existieren.
-// Pipeline legt nur den objektspezifischen Unterordner an, nicht die Basis-Hierarchie.
-const BASE = process.env.ONEDRIVE_BASE_PATH || '/Immobilien/001_AQUISE/Objekte';
+// Pipeline legt nur den inbox-Unterordner an, nicht die Basis-Hierarchie.
+const BASE = process.env.ONEDRIVE_BASE_PATH || '/Immobilien/001_AQUISE/_inbox';
 
 export interface UploadInput {
-  addressFolder: string;
+  folderName: string;
   files: Array<{ name: string; buffer: Buffer; contentType: string }>;
 }
 
@@ -19,7 +19,7 @@ export interface UploadResult {
 export async function uploadFiles(input: UploadInput): Promise<UploadResult> {
   const client = await graphClient();
   const mailbox = getMailbox();
-  const folder = sanitizeFolderName(input.addressFolder);
+  const folder = sanitizeFolderName(input.folderName);
   const folderUrl = `${BASE}/${folder}`;
   const driveRoot = `/users/${mailbox}/drive/root`;
 
