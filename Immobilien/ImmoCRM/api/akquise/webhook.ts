@@ -2,7 +2,7 @@ import { fetchMail } from '../_lib/fetchMail.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 
 export default async function handler(req: Request): Promise<Response> {
-  const url = new URL(req.url);
+  const url = new URL(req.url, 'http://localhost');
   const validationToken = url.searchParams.get('validationToken');
   if (validationToken) {
     return new Response(validationToken, {
