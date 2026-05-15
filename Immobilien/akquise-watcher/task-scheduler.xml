@@ -50,8 +50,8 @@
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>powershell.exe</Command>
-      <Arguments>-NoProfile -ExecutionPolicy Bypass -File "C:\meine-projekte\Immobilien\akquise-watcher\watch-inbox.ps1"</Arguments>
+      <Command>wscript.exe</Command>
+      <Arguments>"C:\meine-projekte\Immobilien\akquise-watcher\watch-inbox.vbs"</Arguments>
     </Exec>
   </Actions>
 </Task>

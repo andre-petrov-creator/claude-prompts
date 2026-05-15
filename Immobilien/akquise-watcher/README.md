@@ -19,12 +19,16 @@ Lokaler Watcher (PowerShell + Windows Task Scheduler), der den OneDrive-`_inbox`
 
 ## Trigger
 
-Der Task Scheduler ruft `watch-inbox.ps1` mit zwei Triggern:
+Der Task Scheduler ruft `watch-inbox.vbs` (VBScript-Wrapper) mit zwei Triggern:
 
 1. **At log on** (30 Sek nach User-Login) — fängt Backlog ab, der während PC-aus angesammelt wurde.
 2. **Every 1 minute** — laufender Betrieb für Mails, die während PC-an reinkommen.
 
 Beide Trigger sind aktiv. `MultipleInstancesPolicy=IgnoreNew` stellt sicher, dass nicht zwei Instanzen parallel laufen.
+
+## Warum VBScript-Wrapper
+
+Direkter Aufruf von `powershell.exe` aus dem Task Scheduler erzeugt jede Minute ein **kurz sichtbares Konsolen-Fenster** (Fenster wird gestartet, dann ggf. versteckt — sichtbares Flash). `watch-inbox.vbs` umgeht das: das VBScript startet PowerShell mit `WindowStyle=0 (Hidden)`, sodass nichts blinkt. Microsoft-empfohlener Standard-Weg für unsichtbare PowerShell-Tasks.
 
 ## Verhalten pro Trigger
 
