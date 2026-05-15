@@ -16,7 +16,7 @@
 | 1 ✅ | Projektstruktur + Meta-Files | CLAUDE.md, GUIDELINES, README, /docs | — |
 | 2 ✅ | venv + Dependencies | Eigenständige Python-Umgebung | 1 |
 | 3 ✅ | Framework: `core/datensatz.py` | GeneralisierterDatensatz portiert + Tests | 2 |
-| 4 | Framework: `core/parsers.py` + `core/modals.py` | Euro/Trend/Ampel + Modal-Helpers + Tests | 3 |
+| 4 ✅ | Framework: `core/parsers.py` + `core/modals.py` | Euro/Trend/Ampel + Modal-Helpers + Tests | 3 |
 | 5 | Framework: `core/browser.py`, `cookies.py`, `inputs.py`, `radios.py`, `selects.py`, `submit.py`, `reader.py` | Playwright-Helpers, parametrisiert | 4 |
 | 6 | Framework: `core/portal_base.py` + `core/runner.py` | Abstrakte Portal-Klasse + Generic-Runner | 5 |
 | 7 | CHECK24-Migration: `portals/check24/` | Bestehender CHECK24-Code in Framework, Live-Lauf grün | 6 |
@@ -128,13 +128,13 @@ laufen.
 Trend-Label) + Modal-Dismisser. Portal-agnostisch.
 
 **Akzeptanzkriterium:**
-- [ ] `_parse_marktwert_block`, `_parse_trends`, `_trend_ampel`,
-  `_build_trend_label` als public-Functions
-- [ ] `dismiss_modal_by_text(page, accept_texts, wrapper_selector)` als
+- [x] `parse_marktwert_block`, `parse_trends`, `trend_ampel`,
+  `build_trend_label` als public-Functions
+- [x] `dismiss_modal_by_text(page, accept_texts)` als
   generischer Modal-Dismisser
-- [ ] 8+ Unit-Tests grün (Marktwert-Format mit Newlines, mit Pipes,
-  empty; Trends-3-fach, negativ; Ampel grün/gelb/rot;
-  Trend-Label-Generierung)
+- [x] 18 Unit-Tests grün (Marktwert: Newlines/Pipes/empty; Trends: 3-fach/
+  negativ/fehlend; Ampel: grün/gelb/rot ×2/DOM-Override;
+  Trend-Label: voll/ohne-Prognose/kein-Portal-Prefix; Modal: visible/skip/empty)
 
 **Betroffene Dateien:**
 - Neu: `core/parsers.py`
