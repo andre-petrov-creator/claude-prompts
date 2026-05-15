@@ -37,13 +37,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .update({ status: 'processing', started_at: new Date().toISOString() })
     .eq('message_id', messageId);
 
+  let step = 'init';
   try {
+    step = 'fetchMail+Attachments';
     const [graphMail, graphAttachments] = await Promise.all([
       fetchMail(graphMessageId),
       fetchAttachments(graphMessageId),
     ]);
+    step = 'parseEmail';
     const mail = parseEmail(graphMail, graphAttachments);
 
+    step = 'resolveLinks';
     const linkAttachments: Array<{ name: string; buffer: Buffer; contentType: string }> = [];
     for (const link of mail.links) {
       const resolved = await resolveLink(link);
@@ -94,8 +98,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     ];
 
+    step = 'uploadFiles';
     const upload = await uploadFiles({ folderName: inboxFolder, files: uploadInput });
 
+    step = 'supabaseUpdate-done';
     await supa
       .from('mail_queue')
       .update({
@@ -113,11 +119,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error && err.stack ? err.stack.slice(0, 1500) : '';
-    console.error('process error', msg, '\n', stack);
+    console.error(`process error at step=${step}`, msg, '\n', stack);
     await supa
       .from('mail_queue')
-      .update({ status: 'error', error_msg: msg + (stack ? '\n--- stack ---\n' + stack : '') })
+      .update({ status: 'error', error_msg: `[step=${step}] ${msg}` + (stack ? '\n--- stack ---\n' + stack : '') })
       .eq('message_id', messageId);
-    res.status(500).json({ ok: false, error: msg });
+    res.status(500).json({ ok: false, error: msg, step });
   }
 }
