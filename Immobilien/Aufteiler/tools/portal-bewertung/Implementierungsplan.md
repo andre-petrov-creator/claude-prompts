@@ -19,7 +19,7 @@
 | 4 ✅ | Framework: `core/parsers.py` + `core/modals.py` | Euro/Trend/Ampel + Modal-Helpers + Tests | 3 |
 | 5 ✅ | Framework: `core/browser.py`, `cookies.py`, `inputs.py`, `radios.py`, `selects.py`, `submit.py`, `reader.py` | Playwright-Helpers, parametrisiert | 4 |
 | 6 ✅ | Framework: `core/portal_base.py` + `core/runner.py` | Abstrakte Portal-Klasse + Generic-Runner | 5 |
-| 7 | CHECK24-Migration: `portals/check24/` | Bestehender CHECK24-Code in Framework, Live-Lauf grün | 6 |
+| 7 ⏳ | CHECK24-Migration: `portals/check24/` | Code portiert, Live-Lauf-Verifikation durch User offen | 6 |
 | 8 | CLI: `m00_portal_pricer.py` (single-portal) | `--portal check24` läuft end-to-end | 7 |
 | 9 | Cleanup: alte `tools/check24/` löschen | Nur ein Code-Pfad für CHECK24 | 8 |
 | 10 | Inspector-Tool: `inspectors/inspect_dom.py` | Generischer DOM-Dumper für neue Portale | 8 |
@@ -223,15 +223,16 @@ für jedes Portal den gleichen Lebenszyklus durchläuft
 gleiches Ergebnis wie altes `tools/check24/m00_check24_pricer.py`.
 
 **Akzeptanzkriterium:**
-- [ ] `portals/check24/selectors.py` + `portals/check24/portal.py`
+- [x] `portals/check24/selectors.py` + `portals/check24/portal.py`
   existieren
-- [ ] `Check24Portal(PortalBase)` implementiert `fill_form()` (richtige
+- [x] `Check24Portal(PortalBase)` implementiert `fill_form()` (richtige
   Reihenfolge der 6 Selects + 6 Inputs + Kaufen-Radio + Zeitrahmen-Klick
   + Pfeil-Nudge) und `dismiss_post_submit_modals()` (Topzinsen + 2.
-  Cookie-Banner)
-- [ ] Live-Lauf mit Prosperstr. 59 → JSON enthält
-  `marktwert_eur_mittel` 170.000–180.000 € + alle drei Trend-Werte +
-  Ampel grün
+  Cookie-Banner) und `extract_dom_colors()` (CHECK24-Farb-Override)
+- [x] 2 Smoke-Tests grün (Adapter erbt von PortalBase, Selektoren vorhanden)
+- [ ] **Offen (Live-Verifikation durch User):** Live-Lauf mit Prosperstr. 59 →
+  JSON enthält `marktwert_eur_mittel` 170.000–180.000 € + alle drei
+  Trend-Werte + Ampel grün
 
 **Betroffene Dateien:**
 - Neu: `portals/__init__.py`
