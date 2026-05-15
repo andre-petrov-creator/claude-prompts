@@ -14,7 +14,7 @@
 | # | Schritt | Ziel | Abhängig von |
 |---|---|---|---|
 | 1 ✅ | Projektstruktur + Meta-Files | CLAUDE.md, GUIDELINES, README, /docs | — |
-| 2 | venv + Dependencies | Eigenständige Python-Umgebung | 1 |
+| 2 ✅ | venv + Dependencies | Eigenständige Python-Umgebung | 1 |
 | 3 | Framework: `core/datensatz.py` | GeneralisierterDatensatz portiert + Tests | 2 |
 | 4 | Framework: `core/parsers.py` + `core/modals.py` | Euro/Trend/Ampel + Modal-Helpers + Tests | 3 |
 | 5 | Framework: `core/browser.py`, `cookies.py`, `inputs.py`, `radios.py`, `selects.py`, `submit.py`, `reader.py` | Playwright-Helpers, parametrisiert | 4 |
@@ -75,10 +75,10 @@ Schritte als Kontext nutzen.
 **Ziel:** Eigenständige Python-Umgebung, getrennt von `tools/check24/.venv/`.
 
 **Akzeptanzkriterium:**
-- [ ] `tools/portal-bewertung/.venv/` angelegt
-- [ ] `pip install -r requirements.txt` + `playwright install chromium`
-  laufen durch
-- [ ] `pytest tests/` läuft (leere Test-Suite oder smoke-test) ohne Fehler
+- [x] `tools/portal-bewertung/.venv/` angelegt (Python 3.14.3)
+- [x] `pip install -r requirements.txt` durch (anthropic 0.102.0, playwright 1.59.0, pytest 9.0.3, python-dotenv 1.2.2)
+- [x] `playwright install chromium` durch (Chromium 147.0.7727.15, war im globalen Cache)
+- [x] `pytest` läuft grün (1 passed — `tests/test_smoke.py`)
 
 **Betroffene Dateien:**
 - Neu: `tools/portal-bewertung/requirements.txt` (playwright, pytest,
