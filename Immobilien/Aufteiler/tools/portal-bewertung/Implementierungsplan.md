@@ -17,7 +17,7 @@
 | 2 ✅ | venv + Dependencies | Eigenständige Python-Umgebung | 1 |
 | 3 ✅ | Framework: `core/datensatz.py` | GeneralisierterDatensatz portiert + Tests | 2 |
 | 4 ✅ | Framework: `core/parsers.py` + `core/modals.py` | Euro/Trend/Ampel + Modal-Helpers + Tests | 3 |
-| 5 | Framework: `core/browser.py`, `cookies.py`, `inputs.py`, `radios.py`, `selects.py`, `submit.py`, `reader.py` | Playwright-Helpers, parametrisiert | 4 |
+| 5 ✅ | Framework: `core/browser.py`, `cookies.py`, `inputs.py`, `radios.py`, `selects.py`, `submit.py`, `reader.py` | Playwright-Helpers, parametrisiert | 4 |
 | 6 | Framework: `core/portal_base.py` + `core/runner.py` | Abstrakte Portal-Klasse + Generic-Runner | 5 |
 | 7 | CHECK24-Migration: `portals/check24/` | Bestehender CHECK24-Code in Framework, Live-Lauf grün | 6 |
 | 8 | CLI: `m00_portal_pricer.py` (single-portal) | `--portal check24` läuft end-to-end | 7 |
@@ -160,18 +160,16 @@ Autocomplete), Radio-Klicker (mit Pfeil-Nudge), Select-Helper,
 Submit-Klicker, iframe-Reader. Portal-agnostisch, parametrisiert.
 
 **Akzeptanzkriterium:**
-- [ ] Folgende Module + Funktionen vorhanden:
-  - `core/browser.py`: `launch_browser(headless) -> (browser, ctx, page)`
-  - `core/cookies.py`: `dismiss_cookies(page, accept_candidates, wrapper_selector, max_wait_s)`
-  - `core/inputs.py`: `input_typed(page, selector_or_index, value)`,
-    `input_street_with_autocomplete(page, selector, value)`
-  - `core/radios.py`: `click_radio(page, qa_ref_selector, nudge=True)`
-  - `core/selects.py`: `select_by_index(page, selector_root, index, label)`,
-    `select_by_label(page, selector, label)`
-  - `core/submit.py`: `submit_form(page, submit_selector)` (mit Scroll +
-    Mouse-Move-Fallback)
-  - `core/reader.py`: `find_result_frame(page, marker_text)`,
-    `read_frame_body_deep(frame)` (Deep-Scroll + Text-Extract)
+- [x] Folgende Module + Funktionen vorhanden:
+  - `core/browser.py`: `launch_browser(p, cfg) -> (browser, ctx, page)`, `BrowserConfig`
+  - `core/cookies.py`: `dismiss_cookies(page, accept_candidates, wrapper_selector, max_wait_s, fallback_remove_selectors)`
+  - `core/inputs.py`: `input_typed`, `input_street_with_autocomplete`, `normalize_strasse_abbrev`
+  - `core/radios.py`: `click_radio(page, qa_ref_selector, nudge_keys)`, `click_radio_by_label_text`
+  - `core/selects.py`: `select_by_index`, `select_by_label`
+  - `core/submit.py`: `wait_for_enabled_submit`, `click_submit`
+  - `core/reader.py`: `find_result_frame`, `deep_scroll_frame`, `read_frame_body_deep`, `read_page_body_deep`
+  - `core/log.py`: `log`, `set_verbose` (zentrale stderr-Logger)
+- [x] 9 Smoke-Tests grün (Importierbarkeit aller Module + normalize_strasse_abbrev)
 
 **Betroffene Dateien:** Neu, alle unter `core/`
 
