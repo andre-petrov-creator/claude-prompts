@@ -25,11 +25,12 @@ from core.portal_base import PortalBase, RunConfig
 
 from . import selectors as sel
 from .parsers import (
+    classify_trend_richtung,
     parse_eur_per_qm_by_ausstattung,
     parse_marktwert_by_ausstattung,
     parse_marktwert_interhyp,
-    parse_trend_2j_pct,
-    trend_ampel_interhyp,
+    parse_svg_path_points,
+    trend_ampel_from_richtung,
 )
 
 
@@ -263,12 +264,7 @@ class InterhypPortal(PortalBase):
 
         1. Marktwert-Range + EUR/m² + Ausstattungs-Tabelle aus dem
            Zusammenfassung-Tab-Body
-        2. Wertentwicklung-Tab + parse Trend-%
-
-        Hinweis: Der Wertentwicklung-Tab nutzt Default-Zeitraum (10 Jahre).
-        Der 2-Jahres-Dropdown-Klick ist Custom-Material-UI und aktuell nicht
-        zuverlaessig auto-klickbar — der gemeldete Trend bezieht sich auf
-        den Default-Zeitraum. Modul 0 kann das beruecksichtigen.
+        2. Wertentwicklung-Tab + SVG-Path-Auswertung fuer 2-J-Trend-Richtung
         """
         marktwert = parse_marktwert_interhyp(body_text)
         eur_per_qm = parse_eur_per_qm_by_ausstattung(body_text)
@@ -277,8 +273,8 @@ class InterhypPortal(PortalBase):
         klasse = self.ausstattung_klasse_gewaehlt or "einfach"
         chosen_eur_per_qm = eur_per_qm.get(klasse)
 
-        trend_pct = _read_wertentwicklung_pct(page)
-        ampel, ampel_label = trend_ampel_interhyp(trend_pct)
+        richtung = _read_trend_2j_via_svg(page)
+        ampel, ampel_label = trend_ampel_from_richtung(richtung)
 
         return {
             "marktwert_eur_min": marktwert["min"],
@@ -292,57 +288,91 @@ class InterhypPortal(PortalBase):
             "marktwert_gehoben_eur": marktwert_by_klasse["gehoben"],
             "marktwert_luxus_eur": marktwert_by_klasse["luxus"],
             "ausstattung_klasse_gewaehlt": klasse,
-            "wertentwicklung_pct": trend_pct,
-            "wertentwicklung_zeitraum": "default (typ. 10 Jahre)",
-            "wertentwicklung_ampel": ampel,
-            "wertentwicklung_ampel_label": ampel_label,
+            "trend_2j_richtung": richtung,
+            "trend_2j_ampel": ampel,
+            "trend_2j_ampel_label": ampel_label,
         }
 
 
-def _read_wertentwicklung_pct(page: Any) -> Optional[float]:
-    """Klickt Wertentwicklung-Tab, parst '+X %'-Wert aus der Kachel.
+_WERTENTWICKLUNG_TAB_SELECTORS = (
+    '[role="tab"]:has-text("Wertentwicklung")',
+    'button[role="tab"]:has-text("Wertentwicklung")',
+    'a[role="tab"]:has-text("Wertentwicklung")',
+    'a:has-text("Wertentwicklung")',
+    'button:has-text("Wertentwicklung")',
+    'label:has-text("Wertentwicklung")',
+    'div:has-text("Wertentwicklung"):not(:has(div))',
+)
 
-    Versucht auch, den Zeitraum-Dropdown auf '2 Jahre' zu stellen — wenn das
-    nicht greift (Material-UI-Custom-Dropdown ohne stabilen Selektor), wird
-    der Default-Zeitraum-Wert (typ. 10 Jahre) gelesen.
 
-    Bei Fehler wird None zurueckgegeben — Adapter bleibt funktional, nur die
-    Ampel wird grau.
+def _read_trend_2j_via_svg(page: Any) -> Optional[str]:
+    """Liest die SVG-Path-Daten der Trend-Linie, klassifiziert Richtung der
+    letzten 2 Jahre als 'steigt' / 'stagniert' / 'faellt'.
+
+    Algorithmus:
+      1. Klick auf Wertentwicklung-Tab (Multi-Strategie)
+      2. Hole alle <path class="highcharts-graph">-Elemente
+      3. Wähle den Pfad mit den meisten Punkten (= Default-Zeitraum, 10 Jahre)
+      4. Parse 'M x y L x y L x y ...' zu (x,y)-Punkten
+      5. Letzte 20% der Punkte = letzte 2 Jahre (Highcharts zeichnet linear)
+      6. Vergleiche Y_start vs Y_end gegen 2% des Y-Range (SVG-invertiert)
+
+    Bei Fehler oder zu wenig Daten: None (Ampel wird grau).
     """
     try:
-        _click_text(page, sel.TAB_WERTENTWICKLUNG)
-        page.wait_for_timeout(1_500)
-
-        # Best-effort: Zeitraum-Dropdown auf '2 Jahre' setzen. Wenn keiner
-        # der Selektoren greift, bleibt's beim Default-Zeitraum.
-        for sel_str in [
-            f'label:has-text("{sel.ZEITRAUM_LABEL}")',
-            f'[aria-label*="{sel.ZEITRAUM_LABEL}"]',
-            'div[role="combobox"]',
-            'div[role="button"][aria-haspopup="listbox"]',
-        ]:
+        # Tab-Klick (Multi-Strategie)
+        clicked = False
+        for s in _WERTENTWICKLUNG_TAB_SELECTORS:
             try:
-                loc = page.locator(sel_str).first
+                loc = page.locator(s).first
                 if loc.count() > 0 and loc.is_visible():
                     loc.click(timeout=2_000)
+                    clicked = True
                     break
             except Exception:
                 continue
-        page.wait_for_timeout(800)
-        for sel_str in [
-            f'li:has-text("{sel.ZEITRAUM_2J_OPTION}")',
-            f'[role="option"]:has-text("{sel.ZEITRAUM_2J_OPTION}")',
-        ]:
-            try:
-                loc = page.locator(sel_str).first
-                if loc.count() > 0 and loc.is_visible():
-                    loc.click(timeout=2_000)
-                    break
-            except Exception:
-                continue
-        page.wait_for_timeout(1_500)
+        if not clicked:
+            return None
+        page.wait_for_timeout(3_000)
 
-        body = page.locator("body").first.inner_text(timeout=5_000)
-        return parse_trend_2j_pct(body)
+        # Lokalisiere den Wertentwicklungs-Chart-Container via 'Marktwert YYYY'-Anker
+        # (die andere Charts auf der Seite — z.B. Preiskarte — matchen das nicht)
+        paths_d = page.evaluate(
+            """
+            () => {
+                let containers = Array.from(document.querySelectorAll('[role="tabpanel"]'))
+                    .filter(p => !p.hidden && window.getComputedStyle(p).display !== 'none');
+                if (containers.length === 0) {
+                    const heading = Array.from(document.querySelectorAll('*'))
+                        .find(el => /Marktwert\\s+\\d{4}/.test(el.textContent || ''));
+                    if (heading) {
+                        let el = heading;
+                        for (let i = 0; i < 10; i++) {
+                            el = el.parentElement;
+                            if (!el) break;
+                            if (el.querySelector('svg path.highcharts-graph')) {
+                                containers = [el];
+                                break;
+                            }
+                        }
+                    }
+                }
+                const found = containers.length > 0
+                    ? containers.flatMap(c => Array.from(c.querySelectorAll('path.highcharts-graph')))
+                    : Array.from(document.querySelectorAll('path.highcharts-graph'));
+                return found
+                    .map(p => p.getAttribute('d') || '')
+                    .filter(d => d.length > 100);
+            }
+            """
+        )
+        if not paths_d:
+            return None
+
+        # Pfad mit den meisten Punkten = Berechnete-Immobilie-Linie
+        # (mehr Datenpunkte als die Ø-Linie wegen Interpolation)
+        path_d = max(paths_d, key=len)
+        points = parse_svg_path_points(path_d)
+        return classify_trend_richtung(points)
     except Exception:
         return None

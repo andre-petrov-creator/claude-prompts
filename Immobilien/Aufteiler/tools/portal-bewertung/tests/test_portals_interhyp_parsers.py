@@ -8,10 +8,13 @@ from __future__ import annotations
 import pytest
 
 from portals.interhyp.parsers import (
+    classify_trend_richtung,
     parse_eur_per_qm_by_ausstattung,
     parse_marktwert_by_ausstattung,
     parse_marktwert_interhyp,
+    parse_svg_path_points,
     parse_trend_2j_pct,
+    trend_ampel_from_richtung,
     trend_ampel_interhyp,
 )
 
@@ -239,5 +242,106 @@ def test_trend_ampel_gelb_at_threshold_plus_one() -> None:
 
 def test_trend_ampel_grau_when_none() -> None:
     ampel, label = trend_ampel_interhyp(None)
+    assert ampel == "grau"
+    assert "keine Daten" in label
+
+
+# ---------------------------------------------------------------------------
+# parse_svg_path_points (Highcharts <path d="M x y L x y L ..." />)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_svg_path_points_simple_M_L() -> None:
+    """Pfad 'M 10 20 L 30 40 L 50 60' -> 3 Punkte."""
+    pts = parse_svg_path_points("M 10 20 L 30 40 L 50 60")
+    assert pts == [(10.0, 20.0), (30.0, 40.0), (50.0, 60.0)]
+
+
+def test_parse_svg_path_points_real_highcharts_sample() -> None:
+    """Live-Sample aus Interhyp's highcharts-graph-Path (Anfang)."""
+    d = (
+        "M 0 1.485 L 2.275 1.92 L 4.477 2.358 L 6.752 2.797 L 9.027 3.238"
+    )
+    pts = parse_svg_path_points(d)
+    assert len(pts) == 5
+    assert pts[0] == (0.0, 1.485)
+    assert pts[-1][0] == 9.027
+
+
+def test_parse_svg_path_points_empty_or_invalid() -> None:
+    assert parse_svg_path_points("") == []
+    assert parse_svg_path_points("M") == []
+    # Ungerade Zahl-Counts -> ungueltig
+    assert parse_svg_path_points("M 1 2 L 3") == []
+
+
+# ---------------------------------------------------------------------------
+# classify_trend_richtung (Klassifizierung aus Punkt-Liste)
+# ---------------------------------------------------------------------------
+
+
+def test_classify_trend_steigt() -> None:
+    # Y faellt von 250 auf 70 ueber 10 Punkte (SVG-invertiert = Preis steigt stark)
+    points = [(i, 250.0 - i * 20) for i in range(10)]
+    assert classify_trend_richtung(points) == "steigt"
+
+
+def test_classify_trend_faellt() -> None:
+    # Y steigt von 50 auf 230 (SVG-invertiert = Preis faellt stark)
+    points = [(i, 50.0 + i * 20) for i in range(10)]
+    assert classify_trend_richtung(points) == "faellt"
+
+
+def test_classify_trend_stagniert_flatline() -> None:
+    # Komplett flach: y_range=0 -> stagniert
+    points = [(float(i), 150.0) for i in range(10)]
+    assert classify_trend_richtung(points) == "stagniert"
+
+
+def test_classify_trend_stagniert_below_min_threshold() -> None:
+    # y_range = 1.0 < min_pixel_threshold (2.0) -> stagniert
+    points = [(i, 150.0 + (i % 2) * 1.0) for i in range(10)]
+    assert classify_trend_richtung(points) == "stagniert"
+
+
+def test_classify_trend_too_few_points_returns_none() -> None:
+    assert classify_trend_richtung([(0.0, 1.0), (1.0, 2.0)]) is None
+    assert classify_trend_richtung([]) is None
+
+
+def test_classify_trend_uses_only_last_fraction() -> None:
+    """Frueher Anstieg darf den Klassifizierer der letzten 20% nicht stoeren."""
+    # Erste 80% steigen stark (Y faellt), letzte 20% fallen (Y steigt) -> faellt
+    early = [(i, 250.0 - i * 20) for i in range(8)]  # Y: 250 -> 110
+    late = [(8 + i, 100.0 + i * 50) for i in range(3)]  # Y: 100, 150, 200
+    points = early + late
+    assert classify_trend_richtung(points) == "faellt"
+
+
+# ---------------------------------------------------------------------------
+# trend_ampel_from_richtung (Mapping richtung -> ampel/label)
+# ---------------------------------------------------------------------------
+
+
+def test_trend_ampel_from_richtung_steigt_gruen() -> None:
+    ampel, label = trend_ampel_from_richtung("steigt")
+    assert ampel == "gruen"
+    assert label == "steigt"
+
+
+def test_trend_ampel_from_richtung_stagniert_gelb() -> None:
+    ampel, label = trend_ampel_from_richtung("stagniert")
+    assert ampel == "gelb"
+    assert label == "stagniert"
+
+
+def test_trend_ampel_from_richtung_faellt_rot() -> None:
+    ampel, label = trend_ampel_from_richtung("faellt")
+    assert ampel == "rot"
+    assert label == "faellt"
+
+
+def test_trend_ampel_from_richtung_none_grau() -> None:
+    ampel, label = trend_ampel_from_richtung(None)
     assert ampel == "grau"
     assert "keine Daten" in label

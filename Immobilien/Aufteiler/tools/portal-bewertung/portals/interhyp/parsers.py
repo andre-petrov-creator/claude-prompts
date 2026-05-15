@@ -158,3 +158,67 @@ def trend_ampel_interhyp(trend_pct: Optional[float]) -> tuple[str, str]:
     if trend_pct < -1.0:
         return "rot", f"fallend ({trend_pct:+.1f}%)"
     return "gelb", f"stagnierend ({trend_pct:+.1f}%)"
+
+
+def parse_svg_path_points(path_d: str) -> list[tuple[float, float]]:
+    """Parst einen SVG-Path-String ('M x y L x y L x y ...') zu (x,y)-Punkten.
+
+    Akzeptiert M-, L-Befehle und implizite L nach M. Komma- und Whitespace-
+    Trennung. Ignoriert ungerade Zahlen-Counts.
+    """
+    nums = [float(n) for n in re.findall(r"-?\d+\.?\d*", path_d)]
+    if len(nums) < 4 or len(nums) % 2 != 0:
+        return []
+    return [(nums[i], nums[i + 1]) for i in range(0, len(nums), 2)]
+
+
+def classify_trend_richtung(
+    points: list[tuple[float, float]],
+    *,
+    last_fraction: float = 0.2,
+    threshold_fraction: float = 0.02,
+    min_pixel_threshold: float = 2.0,
+) -> Optional[str]:
+    """Klassifiziert die Richtung der letzten 'last_fraction' der Punkt-Liste.
+
+    Annahme: Punkte sind nach X aufsteigend sortiert (Zeit links→rechts).
+    Bei einem Highcharts-Default-Zeitraum von 10 Jahren entspricht
+    last_fraction=0.2 etwa den letzten 2 Jahren.
+
+    Y-Achse ist SVG-invertiert: kleinerer Y-Wert = höher gezeichnet = höherer Preis.
+
+    Schwelle: max(y_range * threshold_fraction, min_pixel_threshold).
+    Bei flachen Charts (y_range < min_pixel_threshold) immer 'stagniert'.
+
+    Returns: 'steigt' | 'stagniert' | 'faellt' | None (zu wenige Punkte).
+    """
+    n = len(points)
+    if n < 4:
+        return None
+    n_last = max(2, int(n * last_fraction))
+    last_segment = points[-n_last:]
+    y_start = last_segment[0][1]
+    y_end = last_segment[-1][1]
+    y_values = [y for _, y in points]
+    y_range = max(y_values) - min(y_values)
+    if y_range < min_pixel_threshold:
+        return "stagniert"
+    threshold = max(y_range * threshold_fraction, min_pixel_threshold * 0.5)
+    diff = y_start - y_end
+    if diff > threshold:
+        return "steigt"
+    if diff < -threshold:
+        return "faellt"
+    return "stagniert"
+
+
+def trend_ampel_from_richtung(richtung: Optional[str]) -> tuple[str, str]:
+    """Mappt Richtung ('steigt'/'stagniert'/'faellt'/None) auf Ampel + Label.
+
+    User-Vorgabe: simple Ampel ohne Prozent-Angaben.
+    """
+    return {
+        "steigt": ("gruen", "steigt"),
+        "stagniert": ("gelb", "stagniert"),
+        "faellt": ("rot", "faellt"),
+    }.get(richtung or "", ("grau", "— (keine Daten)"))

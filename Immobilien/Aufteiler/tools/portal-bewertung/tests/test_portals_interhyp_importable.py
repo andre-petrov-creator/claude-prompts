@@ -100,9 +100,9 @@ def test_interhyp_extract_extra_with_sample_body() -> None:
     assert extra["marktwert_einfach_eur"] == 183000
     assert extra["ausstattung_klasse_gewaehlt"] == "einfach"
     # Trend ist None bei FakePage; Ampel = 'grau'
-    assert extra["wertentwicklung_pct"] is None
-    assert extra["wertentwicklung_ampel"] == "grau"
-    assert "Zeitraum" in extra["wertentwicklung_zeitraum"] or "default" in extra["wertentwicklung_zeitraum"]
+    assert extra["trend_2j_richtung"] is None
+    assert extra["trend_2j_ampel"] == "grau"
+    assert "keine Daten" in extra["trend_2j_ampel_label"]
 
 
 def test_interhyp_datensatz_field_sanierungsjahr_letztes_exists() -> None:

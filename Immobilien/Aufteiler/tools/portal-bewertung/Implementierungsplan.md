@@ -25,7 +25,7 @@
 | 10 ✅ | Inspector-Tool: `inspectors/inspect_dom.py` | Generischer DOM-Dumper für neue Portale | 8 |
 | 11 ⏳ | LLM-Recovery: `core/llm_recovery.py` + `core/selectors_store.py` | Module fertig + 10 Tests, Runner-Auto-Integration + Live-Bruchprobe offen | 8 |
 | 12 ⏳ | Neues Portal: Homeday Preisatlas | Adapter fertig + 26 Tests; Live-Lauf-Verifikation durch User offen | 10, 11 |
-| 13 ⏳ | Neues Portal: Interhyp | Adapter fertig + 26 Tests + Live-Lauf läuft; semantische User-Plausibilitätsprüfung offen | 12 |
+| 13 ⏳ | Neues Portal: Interhyp | Adapter fertig + 39 Tests + Live-Lauf inkl. 2-J-Trend via SVG; semantische User-Plausibilitätsprüfung offen | 12 |
 | 14 | Neues Portal: ImmobilienScout24 | Drittes neues Portal (höchstes Anti-Bot-Risiko) | 13 |
 | 15 | Orchestrator + `--alle` Modus | Parallel-Aufruf, Konsens-Median | 14 |
 | 16 | Modul-0-Integration | Aufteiler-Skill ruft Portal-Bewertung, State-Update | 15 |
@@ -420,9 +420,10 @@ URL: https://www.interhyp.de/rechner/immobilienbewertung/
 - [x] CLI-Registry um `interhyp` erweitert
 - [x] Wertentwicklung-Tab-Navigation für 2-Jahres-Trend (mit Fallback bei Fehler)
 - [x] Schema: alle Werte im `extra`-Slot (Homeday-Pattern), inkl. marktwert_eur_min/mittel/max, eur_per_qm je Ausstattung, trend_2j_pct + Ampel
-- [x] 26 Unit-Tests grün (21 Parser inkl. Live-Layout + 5 Smoke), Gesamt-Suite 117 Tests grün
-- [x] End-to-End-Lauf headless gegen echte Site läuft durch (Prosperstr. 59, 45357 Essen → Marktwert 140k/162k/198k, €/m² einfach 2.025)
-- [ ] **Offen (semantische Verifikation durch User):** Plausibilitätscheck der Live-Werte gegen Markt-Erwartung; Bekannte Limitation: Wertentwicklung-Trend ist Default-Zeitraum (10J), nicht 2J (Dropdown-Klick nicht zuverlässig)
+- [x] 39 Unit-Tests grün (34 Parser inkl. Live-Layout + SVG-Path + 5 Smoke), Gesamt-Suite 130 Tests grün
+- [x] End-to-End-Lauf headless gegen echte Site läuft durch (Prosperstr. 59, 45357 Essen → Marktwert 140k/162k/198k, €/m² einfach 2.025, Trend "faellt" ohne Sanierung)
+- [x] 2-Jahres-Trend implementiert via SVG-Path-Auswertung der Highcharts-Linie (User-Vorgabe: simple Ampel ohne %)
+- [ ] **Offen (semantische Verifikation durch User):** Plausibilitätscheck der Live-Werte gegen Markt-Erwartung; Trend-Richtung kann je nach Eingabe-Daten variieren (mit/ohne Sanierung)
 
 **Betroffene Dateien:**
 - Neu: `portals/interhyp/__init__.py`, `selectors.py`, `parsers.py`, `portal.py`
