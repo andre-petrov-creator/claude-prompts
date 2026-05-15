@@ -1,6 +1,11 @@
 # Akquise-Pipeline Cloud-Anthropic — Design
 
-**Status:** Spec (Brainstorming abgeschlossen 2026-05-14, Implementierungsplan ausstehend)
+> **HISTORISCHE REFERENZ — VERWORFEN am 2026-05-15.**
+> Diese Cloud-Anthropic-Variante wurde verworfen, weil Modul 0 lokale Playwright-Skripte (CHECK24, Interhyp, weitere) zwingend braucht. Quick-Check kann damit nicht in einer Vercel-Function laufen. Architektur kehrt zurück zur lokalen Watcher-Variante.
+> Aktive Spec: [`2026-05-14-akquise-pipeline-redesign.md`](2026-05-14-akquise-pipeline-redesign.md) (mit Revisions-Block oben für Playwright + At-log-on-Trigger).
+> Aktiver Plan: [`../plans/2026-05-15-akquise-pipeline-local-watcher-final.md`](../plans/2026-05-15-akquise-pipeline-local-watcher-final.md).
+
+**Status:** VERWORFEN (Spec war Stand 2026-05-14, geprüft und ersetzt 2026-05-15)
 **Datum:** 2026-05-14
 **Autor:** André Petrov (mit Claude Code, Brainstorming-Skill)
 **Verortung:** ImmoCRM-Schritt 7 (`docs/02_implementierungsplan.md` §7)

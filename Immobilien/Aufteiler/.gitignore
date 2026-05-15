@@ -3,6 +3,7 @@ runs/*
 !runs/.gitkeep
 
 # CHECK24-Scraper venv + screenshots + Inspector-Dumps
+# (wird in Step 9 entfernt, sobald Migration ins Framework abgeschlossen ist)
 tools/check24/.venv/
 tools/check24/runs/*.png
 tools/check24/form_dump.html
@@ -10,3 +11,15 @@ tools/check24/form_dump.json
 tools/check24/timing_radios.json
 tools/check24/street_dom.json
 tools/check24/street_dropdown.json
+
+# Portal-Bewertung-Framework
+tools/portal-bewertung/.venv/
+tools/portal-bewertung/.env
+tools/portal-bewertung/runs/*.png
+tools/portal-bewertung/learned_selectors/*.json
+!tools/portal-bewertung/learned_selectors/.gitkeep
+tools/portal-bewertung/inspectors/*.json
+tools/portal-bewertung/inspectors/*.html
+tools/portal-bewertung/__pycache__/
+tools/portal-bewertung/**/__pycache__/
+tools/portal-bewertung/.pytest_cache/

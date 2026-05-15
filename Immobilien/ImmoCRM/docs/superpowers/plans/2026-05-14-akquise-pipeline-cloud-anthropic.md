@@ -1,5 +1,10 @@
 # Akquise-Pipeline Cloud-Anthropic — Implementierungsplan
 
+> **HISTORISCHE REFERENZ — VERWORFEN am 2026-05-15.**
+> Modul 0 muss lokale Playwright-Skripte (CHECK24, Interhyp + 3 weitere) ausführen → Quick-Check kann nicht in Vercel-Function laufen. Zurück zur lokalen Watcher-Architektur.
+> Aktiver Plan: [`2026-05-15-akquise-pipeline-local-watcher-final.md`](2026-05-15-akquise-pipeline-local-watcher-final.md).
+> Aktive Spec: [`../specs/2026-05-14-akquise-pipeline-redesign.md`](../specs/2026-05-14-akquise-pipeline-redesign.md) (mit 2026-05-15-Update-Block für Playwright + At-log-on).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Akquise-Pipeline-Quick-Check vollständig in der Cloud — Vercel-Function orchestriert Anthropic-API (Sonnet extrahiert PDFs, Opus analysiert), schreibt Lead ins CRM, legt Markdown in OneDrive ab. Externer Cron triggert die Verarbeitung. Lokaler Watcher entfällt.

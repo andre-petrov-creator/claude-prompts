@@ -1,10 +1,69 @@
 # Akquise-Pipeline Redesign — Design
 
-**Status:** Spec (Brainstorming abgeschlossen 2026-05-14, Implementierungsplan ausstehend)
-**Datum:** 2026-05-14
+> **REVISION 2026-05-15 — aktiv.** Diese Spec war kurz durch [`2026-05-14-akquise-pipeline-cloud-anthropic.md`](2026-05-14-akquise-pipeline-cloud-anthropic.md) ersetzt; nach Erkenntnis am 2026-05-15, dass Modul 0 lokale Playwright-Skripte (CHECK24, Interhyp + 3 weitere) braucht, ist diese Spec wieder verbindlich. Zwei Detail-Ergänzungen siehe Abschnitt 0 (Revision-Block) unten.
+> Aktiver Plan: [`../plans/2026-05-15-akquise-pipeline-local-watcher-final.md`](../plans/2026-05-15-akquise-pipeline-local-watcher-final.md). Vormittag-Plan [`../plans/2026-05-14-akquise-pipeline-redesign.md`](../plans/2026-05-14-akquise-pipeline-redesign.md) ist Vorlage, aber durch die heutige Version überschrieben.
+
+**Status:** AKTIV (mit Revision-Block 2026-05-15)
+**Datum:** 2026-05-14 (Revision: 2026-05-15)
 **Autor:** André Petrov (mit Claude Code, Brainstorming-Skill)
 **Verortung:** ImmoCRM-Schritt 7 (`docs/02_implementierungsplan.md` §7)
-**Ersetzt:** `2026-05-11-akquise-pipeline-cloud-design.md` (alte Spec bleibt als historische Referenz mit Banner)
+**Ersetzt:** `2026-05-11-akquise-pipeline-cloud-design.md` (alte Cloud-Variante)
+
+---
+
+## 0. Revision-Block 2026-05-15 (Inhaltliche Ergänzungen)
+
+Folgende Detail-Punkte überschreiben/präzisieren den Haupttext der Spec. Bei Widerspruch gilt dieser Block.
+
+### 0.1 Modul-0-Skill: Playwright-Integration
+
+Modul 0 wird vom User selbst um vier lokale Skripte erweitert (außerhalb dieses Plans):
+- Playwright-Skript "CHECK24" — Marktwert-Lookup pro Stadtteil
+- Playwright-Skript "Interhyp" — alternativer Marktwert-Datenpunkt
+- 2 weitere Skripte (TBD, durch User definiert)
+
+Diese Skripte laufen **zwingend lokal** (Headless-Browser-Engine, keine Cloud-Funktion). Das ist der eigentliche Grund, warum die Akquise-Pipeline-Verarbeitung lokal bleibt — nicht das PDF-Parsing (das könnten wir auch in der Cloud machen). Quick-Check-Sequenz im Akquise-Modus:
+
+```
+1. PDFs lesen (Claude Code Read-Tool, lokal)
+2. Adresse extrahieren (LLM-Call, lokal)
+3. Playwright-Skripte aufrufen (lokal) → Marktwert-Konsens-Daten
+4. Modul-0-Berechnung (Gap-Formel mit lokalen Marktwerten)
+5. CRM-Insert + Markdown + Ordner-Rename
+```
+
+**Plan-Scope:** Der heutige Plan (`2026-05-15-akquise-pipeline-local-watcher-final.md`) liefert die Pipeline-Infrastruktur (Watcher + Task Scheduler + Trigger-Handling + Headless-Claude-Aufruf). Die Modul-0-Skill-Anpassung selbst macht der User danach in einem separaten Bau-Schritt.
+
+### 0.2 Task-Scheduler-Trigger: zwei statt einer
+
+Der Task-Scheduler-Job hat **zwei** Trigger statt nur dem 60-Sek-Polling:
+
+| Trigger | Zweck |
+|---|---|
+| `At log on` (eines beliebigen Users) | PC fährt hoch → sofortiger Backlog-Scan. Mails, die während PC-aus reinkamen, werden ohne 60-Sek-Wartezeit abgearbeitet. |
+| `Every 1 minute` (Repetition) | Laufender Betrieb. Mails während PC-an werden innerhalb 1 Min gesehen. |
+
+Beide aktiv, Multi-Instance-Policy: `IgnoreNew` (kein paralleler Doppellauf, der zweite Trigger wartet bis erste fertig).
+
+### 0.3 Skill-Aufruf-Syntax (Headless Claude Code)
+
+Die heute Vormittag im Plan-§5.5 angedachte Form `claude --print --skill <name> --arg <path>` existiert in der Claude-Code-CLI nicht (verifiziert 2026-05-14 im Trockentest). Korrekte Form für Headless-Aufruf:
+
+```powershell
+claude --print --permission-mode acceptEdits "Verwende den Skill aufteiler-modul-0-quickcheck im Akquise-Modus mit dem Ordnerpfad: <folder>"
+```
+
+Skill-Erkennung läuft über den Prompt-Text. `--permission-mode acceptEdits` erlaubt File-Operationen ohne Permission-Popups. Der Skill bekommt den Pfad aus dem Prompt — er prüft selbst (Abschnitt 0 des Skills, Modus-Check), ob `_meta.json` + `.processing` im Ordner liegen → Akquise-Modus.
+
+### 0.4 cron-job.org wird NICHT benötigt
+
+Account-Anlage am 2026-05-14 war im Hinblick auf die Cloud-Anthropic-Variante. Mit lokaler Variante ist der externe Cron überflüssig — Windows-Task-Scheduler übernimmt. Account kann ungenutzt bleiben oder gelöscht werden (User-Entscheidung).
+
+### 0.5 Token-Kosten: 0 € statt 15 Cent/Mail
+
+In der Cloud-Anthropic-Variante hätte jeder Quick-Check ~15 Cent Anthropic-API-Tokens gekostet. In der lokalen Variante deckt das Claude-Code-Pauschal-Abo den Token-Verbrauch ab. Akzeptanzkriterium A12 (Token < 50 Cent/Mail) ist trivial erfüllt.
+
+---
 
 ---
 
