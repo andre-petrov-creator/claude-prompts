@@ -75,8 +75,15 @@ try {
       # Headless Claude-Code-Aufruf.
       # CLI hat keine --skill/--arg Optionen — Skill und Argument gehen via Prompt-Text.
       # Skill-Frontmatter (B5) muss den Akquise-Modus an "Ordnerpfad enthaelt .processing" erkennen.
+      # CWD auf Trigger-Ordner setzen, damit Claude-Sandbox die OneDrive-Files lesen darf
+      # (schtasks startet sonst aus C:\WINDOWS\system32 und blockiert alle OneDrive-Pfade).
+      Set-Location $folder
+
       $prompt = "Verwende den Skill aufteiler-modul-0-quickcheck im Akquise-Modus mit dem Ordnerpfad: $folder"
-      $claudeOutput = & claude --print --permission-mode acceptEdits $prompt 2>&1
+      # Prompt via stdin (statt positional) — sonst schluckt `--add-dir <directories...>` (variadic)
+      # den Prompt als zweites Directory. Stdin-Pipe schliesst gleichzeitig den stdin-Wait-Block.
+      # --add-dir gibt Sandbox-Zugriff auf das Aufteiler-Repo (CHECK24-Tool, Skill-Junctions).
+      $claudeOutput = $prompt | & claude --print --permission-mode acceptEdits --add-dir "c:\meine-projekte\Immobilien\Aufteiler" 2>&1
       $exitCode = $LASTEXITCODE
       $claudeOutput | Out-File -FilePath $logFile -Append -Encoding utf8
 
