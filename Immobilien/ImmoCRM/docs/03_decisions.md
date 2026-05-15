@@ -762,3 +762,59 @@ Aufwand-Nutzen ungünstig im Single-User-MVP:
   - Cloud-Variante: ~3h Bau, 4,5 MB Limit + Toast bei Übergröße
   - Lokal-Variante: ~6h Bau, ohne Größenlimit, wiederverwendet `automatisierung-aquise/modules/m05_address_extractor.py`
   - Entscheidung dann mit echten Nutzungsdaten ("wie oft droppe ich PDFs wirklich?")
+
+---
+
+## ADR-017 — Akquise-Pipeline mit lokalem Watcher (final)
+
+- **Datum:** 2026-05-15
+- **Status:** Accepted
+- **Schritt:** Schritt 7 (Akquise-Pipeline-Integration)
+
+### Kontext
+
+Drei Architektur-Iterationen für die Akquise-Pipeline:
+1. **Cloud-only (2026-05-11):** Vercel-Function mit `pdf-parse`. Verworfen wegen DOMMatrix-Bug in Vercel-Node-Runtime.
+2. **Cloud-Anthropic-Pivot (2026-05-14 Vormittag):** Versuch, PDF-Lesen via Anthropic-API in Vercel zu machen. Verworfen am 2026-05-15, weil Modul 0 lokale Playwright-Skripte (CHECK24, Interhyp, weitere Marktwert-Portale) zwingend braucht — Quick-Check kann damit nicht in einer Vercel-Function laufen.
+3. **Lokaler Watcher (final, 2026-05-15):** Cloud-Briefträger + PowerShell-Watcher + headless Claude Code mit Aufteiler-Modul-0-Skill im Akquise-Modus.
+
+### Entscheidung
+
+Lokaler PowerShell-Watcher (Windows Task Scheduler mit `At log on` + `Every 1 minute` Triggern) ruft headless `claude --print` mit dem Aufteiler-`aufteiler-modul-0-quickcheck`-Skill auf. Skill ist **Dual-Mode**: Orchestrator-Modus (Aufteiler-Vollanalyse via `objekt_slug`) und Akquise-Modus (Pipeline mit `_meta.json` + PDFs + body.txt im Ordner). Cloud bleibt reiner Briefträger (Webhook empfängt Notification, lädt Mail-Anhänge + body-Text nach OneDrive `_inbox/<msg-id>/`). Marktwert-Quelle im Stub: CHECK24-Python-Tool — Erweiterung um Homeday/Interhyp/ImmoScout24 läuft parallel im `Aufteiler/plans/2026-05-15-portal-bewertung-framework.md`.
+
+### Begründung
+
+- **Playwright-Integration** für Marktwert-Lookup zwingend lokal (Headless-Browser im Cloud-Function-Sandbox unzuverlässig)
+- **0 € Token-Kosten** — Claude-Code-Pauschal-Abo deckt den LLM-Verbrauch im Quick-Check ab (vs. ~15 ¢/Mail bei Cloud-Anthropic-Variante)
+- **Skill bleibt single-source** auf GitHub (kein Cloud-/Lokal-Duplikat)
+- **PC-aus-Stau** wird durch `At log on`-Trigger sauber abgearbeitet (30 Sek Delay, dann Backlog-Scan)
+- **Verworfene Alternativen:** Eigener Server (Hetzner, ~55-110 €/Monat, zu viel Wartung); Dauer-Session Claude Code (Token-Verbrauch im Leerlauf inakzeptabel)
+
+### Konsequenzen
+
+- **Cloud-Briefträger** (`api/akquise/{webhook,process}.ts` + `api/_lib/{fetchMail,parseEmail,resolveLink,uploadOneDrive,supabaseAdmin,msGraphClient}.ts`): committed, läuft. Bug-Marathon am 2026-05-15 brachte 5 Cloud-Fixes:
+  1. uploadOneDrive Content-Type-Header
+  2. `ONEDRIVE_BASE_PATH`-ENV-Override hartcoded
+  3. SDK `.put(buffer)`-Quirk → alle Uploads via `createUploadSession`
+  4. `createUploadSession`-Body mit `item`-Wrapper (Microsoft-Doku-Vertrag)
+  5. **`encodeURIComponent(file.name)`** in API-URL — eigentlicher Killer-Bug bei Filenames mit `#` oder Unicode (`PDF-Exposé #20982.pdf`)
+- **body.txt-Persistierung**: Mail-Body wird als zusätzliches `body.txt` in den OneDrive-Ordner geschrieben. Skill liest sie als sekundäre Quelle.
+- **Skill-Hinweis Adress-Priorisierung** (gegen False-Positives): Skill nutzt PDF PRIMÄR für Objektadresse, `body.txt` nur als Plausibilitäts-Check, **Maklerfirma-Adressen aus Signaturen/Footern NIEMALS als Objektadresse** verwenden.
+- **Lokaler Watcher** (`Immobilien/akquise-watcher/`): PowerShell + Task Scheduler. Sandbox-Fixes:
+  - `Set-Location $folder` vor claude-Aufruf (sonst CWD = `C:\WINDOWS\system32`, Sandbox blockt OneDrive)
+  - `$prompt | claude` via stdin (variadic `--add-dir` schluckt sonst positional prompt)
+  - `--add-dir "c:\meine-projekte\Immobilien\Aufteiler"` für CHECK24-Tool-Zugang
+- **Watcher-XML mit Dual-Trigger** (`At log on` Delay PT30S + `Every 1 minute`).
+
+### Offene Punkte für nächste Session
+
+1. **Watcher braucht `--allowedTools "Bash Read Write Edit Glob Grep"`** — aktuell `--permission-mode acceptEdits` erlaubt File-Operationen, aber blockt Bash-Calls (CHECK24-Tool-Aufruf). Skill steigt aktuell mit *"CHECK24-Tool-Command erfordert Bestätigung"* aus.
+2. **`deals`-Schema-Check** — Skill-Anweisung referenziert `label`-Spalte, die in DB nicht existiert (`column deals.label does not exist`). Korrektes Feld vermutlich `objekt_slug` oder neue Migration.
+3. **Phase 2** (siehe Brainstorming-Prompt am Ende von `plans/2026-05-15-akquise-pipeline-local-watcher-final.md`): KI-Klassifikation der Anhänge, Bilder-/Unterlagen-Sub-Ordner, Link-Pipeline mit Playwright-Scraping (HTML-Exposé, Diashow-Bilder, Drucken-Button-PDF).
+
+### Referenzen
+
+- Aktive Spec: [`docs/superpowers/specs/2026-05-14-akquise-pipeline-redesign.md`](superpowers/specs/2026-05-14-akquise-pipeline-redesign.md) (mit Revision-Block 2026-05-15)
+- Aktiver Plan: [`docs/superpowers/plans/2026-05-15-akquise-pipeline-local-watcher-final.md`](superpowers/plans/2026-05-15-akquise-pipeline-local-watcher-final.md)
+- Skill: `Immobilien/Aufteiler/skills/aufteiler-modul-0-quickcheck/SKILL.md` (Abschnitt 0)
+- Watcher: `Immobilien/akquise-watcher/`

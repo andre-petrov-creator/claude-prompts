@@ -176,9 +176,13 @@ Verankert auch in [DEVELOPMENT_GUIDELINES.md](../DEVELOPMENT_GUIDELINES.md) Absc
 
 ## Schritt 7: Akquise-Pipeline (Cloud-Briefträger + Lokaler Quick-Check)
 
-**Status:** Im Umbau (2026-05-14). Cloud-Webhook + mail_queue läuft, alter Cloud-PDF-Pfad ist kaputt (`pdf-parse`/DOMMatrix), Redesign auf Cloud=dummer Briefträger + lokaler Quick-Check über Aufteiler-Skill.
+**Status:** 🟡 Phase 1 weitgehend durch (2026-05-15). Cloud-Pfad end-to-end verifiziert, Watcher + Skill (Akquise-Modus) laufen. **Offen:** Watcher-`--allowedTools` für CHECK24-Bash-Aufruf, `deals`-Schema-Mismatch, Phase 2.
 
-**Aktive Spec:** [`docs/superpowers/specs/2026-05-14-akquise-pipeline-redesign.md`](superpowers/specs/2026-05-14-akquise-pipeline-redesign.md)
+**Aktive Spec:** [`docs/superpowers/specs/2026-05-14-akquise-pipeline-redesign.md`](superpowers/specs/2026-05-14-akquise-pipeline-redesign.md) (mit Revision-Block 2026-05-15)
+
+**Aktiver Plan:** [`docs/superpowers/plans/2026-05-15-akquise-pipeline-local-watcher-final.md`](superpowers/plans/2026-05-15-akquise-pipeline-local-watcher-final.md)
+
+**ADR:** [ADR-017](03_decisions.md#adr-017--akquise-pipeline-mit-lokalem-watcher-final)
 
 **Historische Spec (ersetzt):** [`docs/superpowers/specs/2026-05-11-akquise-pipeline-cloud-design.md`](superpowers/specs/2026-05-11-akquise-pipeline-cloud-design.md)
 
@@ -188,26 +192,31 @@ Verankert auch in [DEVELOPMENT_GUIDELINES.md](../DEVELOPMENT_GUIDELINES.md) Absc
 Mail → CRM-Eingang (M365)
   → Webhook (Vercel, läuft)
   → mail_queue (Supabase)
-  → /api/akquise/process (abgespeckt: nur Files+Trigger in OneDrive _inbox/)
+  → /api/akquise/process (Cloud-Briefträger: PDFs + body.txt + _meta.json + .trigger → OneDrive _inbox/<msg-id>/)
   → OneDrive synct auf PC
-  → Task Scheduler 60s → PowerShell-Watcher findet .trigger
-  → claude --skill akquise-quickcheck
+  → Task Scheduler (At log on + Every 1 minute) → PowerShell-Watcher findet .trigger
+  → claude --print --permission-mode acceptEdits --add-dir Aufteiler [stdin: Skill-Prompt]
+  → aufteiler-modul-0-quickcheck im Akquise-Modus
   → Lead im CRM mit Score, Ordner umbenannt, .code-workspace für späteren Wiedereinstieg
 ```
 
-**Aufgaben-Skizze (Detail-Plan separat via writing-plans):**
-1. DB-Migration `005_mail_queue_status_extension.sql`
-2. Cloud-Code abspecken (process.ts, Files unter api/_lib/ raus, pdf-parse weg)
-3. uploadOneDrive-Pfad anpassen (`_inbox/<msg-id>/`)
-4. Akquise-Watcher anlegen (`c:\meine-projekte\Immobilien\akquise-watcher\`)
-5. Akquise-Quick-Check-Skill bauen (`Aufteiler/skills/akquise-quickcheck/`)
-6. Task Scheduler einrichten
-7. E2E-Test mit Test-Mail
-8. Doku-Updates
+**Phase-1-Status (heute 2026-05-15):**
 
-**Aufwand:** ~12 h gesamt. Reihenfolge: B1→B2→B3 (Cloud), parallel B4+B5 (Lokal), dann B6+B7+B8.
+| Substep | Status |
+|---|---|
+| DB-Migration `mail_queue` | ✅ committed |
+| Cloud-Code abgespeckt (process.ts) | ✅ |
+| Cloud-Bug-Marathon (5 Fixes inkl. file.name URL-encoding) | ✅ |
+| body.txt-Persistierung | ✅ |
+| Akquise-Watcher (PowerShell + Task Scheduler XML) | ✅ |
+| Modul-0-Skill Dual-Mode + Akquise-Modus Stub mit CHECK24 | ✅ |
+| Skill Adress-Priorisierung (Sender-Adress-Falle entschärft) | ✅ |
+| E2E bis Skill-Lauf | ✅ |
+| Watcher-Allowed-Tools (Bash für CHECK24) | ⬜ |
+| `deals`-Schema-Match | ⬜ |
+| Lead landet im CRM-UI | ⬜ |
 
-**Output:** Mail kommt rein → max ~5 Min später Lead mit Score im CRM, ohne PC-Aktion bei wachem PC, mit Stau-Abarbeitung bei PC-aus.
+**Phase 2 (separater Plan, eigene Session):** KI-Klassifikation der Anhänge (Exposé, Mietaufstellung, Energieausweis, Bilder, Unterlagen), `bilder/`-/`unterlagen/`-Sub-Ordner, Link-Pipeline mit Playwright-Scraping (HTML-Exposé, Diashow-Bilder, Drucken-Button-PDF). Brainstorming-Prompt steht am Ende des aktiven Plans.
 
 ---
 
