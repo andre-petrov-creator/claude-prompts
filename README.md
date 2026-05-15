@@ -15,6 +15,7 @@ GitHub-Spiegel zur Sicherung: `github.com/andre-petrov-creator/meine-projekte`
 | `Immobilien/Aufteiler/` | MFH-Aufteiler-Skill (Module 0–5, Orchestrator, Excel-Template) | aktiv |
 | `Immobilien/Unterlagen-Check-Ankauf/` | MFH-Due-Diligence-Skill (Junction → `~/.claude/skills/unterlagen-check-ankauf`) | aktiv |
 | `Immobilien/ImmoCRM/` | Lead-/Kontakt-CRM (Vite + React + Supabase + Vercel) — Phase 2/3 im Bau | aktiv |
+| `Immobilien/akquise-watcher/` | Lokaler PowerShell-Watcher für die Akquise-Pipeline. Task Scheduler (At-log-on + Every-1-min) ruft Claude Code (headless) mit Modul-0-Skill im Akquise-Modus auf, sobald eine `.trigger`-Datei im OneDrive-`_inbox` auftaucht. Spec: [`Immobilien/ImmoCRM/docs/superpowers/specs/2026-05-14-akquise-pipeline-redesign.md`](Immobilien/ImmoCRM/docs/superpowers/specs/2026-05-14-akquise-pipeline-redesign.md). | aktiv |
 | `skills/claude-code-blueprint/` | Skill für Claude-Code-Projekt-Setup (Junction → `~/.claude/skills/claude-code-blueprint`) | aktiv |
 | `commands/` | Custom Slash-Commands (Junction → `~/.claude/commands`) | aktiv |
 | `automatisierung-aquise/` | Python-Pipeline: Akquise-Mails → PDF/Adresse → Objekt-Ordner | aktiv |
@@ -54,3 +55,4 @@ git push
 - **2026-05-08**: `Immobilien/ImmoCRM/` aufgenommen (Phase 2/3): Vite + React 18 + TS strict, Tailwind + shadcn/ui (zinc), Supabase-Client. Smoke-Build grün. Supabase-Projekt + Vercel-Deployment durch User manuell.
 - **2026-05-09**: `Immobilien/ImmoCRM/` Schritt 1 (DB-Schema) abgeschlossen: 6 Tabellen + Followup-View + RLS + GRANTs + NRW-Feiertage-Seed (22) atomar via Supabase MCP applied. Supabase CLI als devDep, npm-Scripts (db:push, db:reset, types:generate). TypeScript-Types generiert (518 LoC).
 - **2026-05-11**: `Immobilien/ImmoCRM/` Schritt 2 (Lead-Liste read-only) abgeschlossen: TanStack Table mit 21 Spalten, 3 kollabierbare Sektionen (Berechnet/Offen/Absage), Status-Badges, Sortierung, globale Suche, Spalten-Sichtbarkeit, React Router (Leads/Kontakte), react-query als Server-State. Demo-Seed via MCP (3 Makler + 5 Deals + 1 überfälliger Followup).
+- **2026-05-15**: `Immobilien/akquise-watcher/` aufgenommen. Lokaler PowerShell-Watcher als finale Architektur für die Akquise-Pipeline (Cloud-Briefträger + lokaler Quick-Check via Modul-0-Skill im Akquise-Modus mit CHECK24-Marktwert-Tool).
