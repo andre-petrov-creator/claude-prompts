@@ -47,8 +47,11 @@ export async function uploadFiles(input: UploadInput): Promise<UploadResult> {
   for (const file of input.files) {
     let session: any;
     try {
+      // file.name URL-encoden — sonst bricht Microsoft Graph bei Sonderzeichen
+      // wie `#` (Fragment-Marker), `?`, oder Unicode (z.B. `é`).
+      const encodedName = encodeURIComponent(file.name);
       session = await client
-        .api(`${driveRoot}:${folderUrl}/${file.name}:/createUploadSession`)
+        .api(`${driveRoot}:${folderUrl}/${encodedName}:/createUploadSession`)
         .post({ item: { '@microsoft.graph.conflictBehavior': 'replace' } });
     } catch (err: any) {
       throw new Error(`createUploadSession failed for ${file.name} (status=${err?.statusCode}): ${err?.message || String(err)} body=${JSON.stringify(err?.body || err?.response || {}).slice(0, 300)}`);
