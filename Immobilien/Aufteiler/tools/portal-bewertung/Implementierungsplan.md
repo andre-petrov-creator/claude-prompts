@@ -18,7 +18,7 @@
 | 3 ✅ | Framework: `core/datensatz.py` | GeneralisierterDatensatz portiert + Tests | 2 |
 | 4 ✅ | Framework: `core/parsers.py` + `core/modals.py` | Euro/Trend/Ampel + Modal-Helpers + Tests | 3 |
 | 5 ✅ | Framework: `core/browser.py`, `cookies.py`, `inputs.py`, `radios.py`, `selects.py`, `submit.py`, `reader.py` | Playwright-Helpers, parametrisiert | 4 |
-| 6 | Framework: `core/portal_base.py` + `core/runner.py` | Abstrakte Portal-Klasse + Generic-Runner | 5 |
+| 6 ✅ | Framework: `core/portal_base.py` + `core/runner.py` | Abstrakte Portal-Klasse + Generic-Runner | 5 |
 | 7 | CHECK24-Migration: `portals/check24/` | Bestehender CHECK24-Code in Framework, Live-Lauf grün | 6 |
 | 8 | CLI: `m00_portal_pricer.py` (single-portal) | `--portal check24` läuft end-to-end | 7 |
 | 9 | Cleanup: alte `tools/check24/` löschen | Nur ein Code-Pfad für CHECK24 | 8 |
@@ -194,13 +194,13 @@ für jedes Portal den gleichen Lebenszyklus durchläuft
 (Browser → Cookies → fill_form → submit → modals → frame → parse → JSON).
 
 **Akzeptanzkriterium:**
-- [ ] `PortalBase` definiert die Properties + abstrakten Methoden
+- [x] `PortalBase` definiert die Properties + abstrakten Methoden
   (`NAME`, `START_URL`, `COOKIE_ACCEPT_CANDIDATES`, `COOKIE_WRAPPER`,
   `SUBMIT_SELECTOR`, `RESULT_FRAME_MARKER`, `fill_form()`,
-  `dismiss_post_submit_modals()`, `parse_result()` mit Default)
-- [ ] `run(portal, datensatz, cfg) -> dict` orchestriert den vollen Lauf
-- [ ] Smoke-Test: dummy-Portal-Klasse → Runner ruft alle Methoden in
-  richtiger Reihenfolge (mocked Playwright)
+  `dismiss_post_submit_modals()`, `extract_dom_colors()` mit Default)
+- [x] `run_with_page(portal, datensatz, page, cfg)` + `run(portal, datensatz, cfg)` orchestriert vollen Lauf
+- [x] `RunResult` mit `.to_dict()` + `.to_json()` matched Output-Schema
+- [x] Smoke-Test: 5 Tests grün (DummyPortal + FakePage → Hook-Reihenfolge, Error-Pfade, Schema-Output)
 
 **Betroffene Dateien:**
 - Neu: `core/portal_base.py`
