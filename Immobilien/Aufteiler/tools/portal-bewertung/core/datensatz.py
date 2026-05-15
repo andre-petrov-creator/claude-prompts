@@ -60,6 +60,11 @@ class GeneralisierterDatensatz:
     hat_garage: bool = False
     hat_aussenstellplatz: bool = False
 
+    # Optional: Jahr der jüngsten Sanierung (Dach, Heizung, Fassade, Fenster).
+    # None = keine Sanierungs-Info aus Exposé. Interhyp nutzt das Feld direkt
+    # (Wizard-Step "Hat eine Sanierung stattgefunden?"). Andere Portale ignorieren.
+    sanierungsjahr_letztes: Optional[int] = None
+
     def __post_init__(self) -> None:
         if self.zustand not in ZUSTAND_VALUES:
             raise ValueError(f"zustand muss {ZUSTAND_VALUES} sein, war {self.zustand!r}")
@@ -86,6 +91,7 @@ def from_summary(
     anzahl_garagen: int = 0,
     anzahl_aussenstellplaetze: int = 0,
     avg_badezimmer: int = 1,
+    sanierungsjahr_letztes: Optional[int] = None,
 ) -> GeneralisierterDatensatz:
     """Aus aggregierten Summen rechnen (häufiger Quick-Check-Fall)."""
     if anzahl_we < 1:
@@ -106,6 +112,7 @@ def from_summary(
         avg_badezimmer=avg_badezimmer,
         hat_garage=(anzahl_garagen / anzahl_we) >= 0.5,
         hat_aussenstellplatz=(anzahl_aussenstellplaetze / anzahl_we) >= 0.5,
+        sanierungsjahr_letztes=sanierungsjahr_letztes,
     )
 
 
@@ -123,6 +130,7 @@ def from_lists(
     badezimmer_liste: Optional[list[int]] = None,
     anzahl_garagen: int = 0,
     anzahl_aussenstellplaetze: int = 0,
+    sanierungsjahr_letztes: Optional[int] = None,
 ) -> GeneralisierterDatensatz:
     """Aus Einzel-WE-Listen rechnen (genauerer Modul-1-Fall)."""
     if not wohnflaechen_qm or not zimmer_liste:
@@ -148,4 +156,5 @@ def from_lists(
         avg_badezimmer=max(1, avg_bad),
         hat_garage=(anzahl_garagen / anzahl_we) >= 0.5,
         hat_aussenstellplatz=(anzahl_aussenstellplaetze / anzahl_we) >= 0.5,
+        sanierungsjahr_letztes=sanierungsjahr_letztes,
     )

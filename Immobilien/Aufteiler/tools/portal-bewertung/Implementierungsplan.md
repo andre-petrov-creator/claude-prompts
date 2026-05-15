@@ -25,7 +25,7 @@
 | 10 ✅ | Inspector-Tool: `inspectors/inspect_dom.py` | Generischer DOM-Dumper für neue Portale | 8 |
 | 11 ⏳ | LLM-Recovery: `core/llm_recovery.py` + `core/selectors_store.py` | Module fertig + 10 Tests, Runner-Auto-Integration + Live-Bruchprobe offen | 8 |
 | 12 ⏳ | Neues Portal: Homeday Preisatlas | Adapter fertig + 26 Tests; Live-Lauf-Verifikation durch User offen | 10, 11 |
-| 13 | Neues Portal: Interhyp | Zweites neues Portal | 12 |
+| 13 ⏳ | Neues Portal: Interhyp | Adapter fertig + 26 Tests + Live-Lauf läuft; semantische User-Plausibilitätsprüfung offen | 12 |
 | 14 | Neues Portal: ImmobilienScout24 | Drittes neues Portal (höchstes Anti-Bot-Risiko) | 13 |
 | 15 | Orchestrator + `--alle` Modus | Parallel-Aufruf, Konsens-Median | 14 |
 | 16 | Modul-0-Integration | Aufteiler-Skill ruft Portal-Bewertung, State-Update | 15 |
@@ -411,7 +411,36 @@ Wiederverwendbarkeit.
 
 URL: https://www.interhyp.de/rechner/immobilienbewertung/
 
-**Akzeptanzkriterium:** Wie Step 12, mit `--portal interhyp`.
+**Akzeptanzkriterium:**
+- [x] `portals/interhyp/selectors.py` + `portals/interhyp/parsers.py` + `portals/interhyp/portal.py` existieren
+- [x] 9-Schritt-Wizard wird vom Adapter komplett durchgeklickt (kein Deep-Link wie Homeday)
+- [x] Multi-Strategie-Locators für Material-UI-Floating-Labels + Karten-Radios
+- [x] Schutz vor Footer-Button-Kollision („Sind Sie zufrieden? Ja/Nein") via `:not(:has-text("zufrieden"))`-Filter
+- [x] `core/datensatz.py` um `sanierungsjahr_letztes: Optional[int] = None` erweitert
+- [x] CLI-Registry um `interhyp` erweitert
+- [x] Wertentwicklung-Tab-Navigation für 2-Jahres-Trend (mit Fallback bei Fehler)
+- [x] Schema: alle Werte im `extra`-Slot (Homeday-Pattern), inkl. marktwert_eur_min/mittel/max, eur_per_qm je Ausstattung, trend_2j_pct + Ampel
+- [x] 26 Unit-Tests grün (21 Parser inkl. Live-Layout + 5 Smoke), Gesamt-Suite 117 Tests grün
+- [x] End-to-End-Lauf headless gegen echte Site läuft durch (Prosperstr. 59, 45357 Essen → Marktwert 140k/162k/198k, €/m² einfach 2.025)
+- [ ] **Offen (semantische Verifikation durch User):** Plausibilitätscheck der Live-Werte gegen Markt-Erwartung; Bekannte Limitation: Wertentwicklung-Trend ist Default-Zeitraum (10J), nicht 2J (Dropdown-Klick nicht zuverlässig)
+
+**Betroffene Dateien:**
+- Neu: `portals/interhyp/__init__.py`, `selectors.py`, `parsers.py`, `portal.py`
+- Geändert: `core/datensatz.py` (neues optionales Feld)
+- Geändert: `m00_portal_pricer.py` (PORTAL_REGISTRY)
+- Neu: `tests/test_portals_interhyp_parsers.py`, `test_portals_interhyp_importable.py`
+- Neu: `docs/portal-interhyp.md`
+- Neu: `inspectors/probe_interhyp.py` (DEV-Tool zum Wizard-Probing)
+
+**Doku-Update:**
+- `/docs/portal-interhyp.md` — Architektur, Wizard-Steps, Stolpersteine, Live-Erwartungen
+
+**Edge-Cases (im Adapter behandelt):**
+- Cookie-Banner kommt Session-abhängig — `core/cookies.py` mit max_wait_s=12
+- Floating-Labels — `get_by_label` vor `get_by_placeholder`
+- Strassen-Autocomplete erfordert Klick (Enter reicht nicht) — `_click_strasse_dropdown_item`
+- Sanierungs-Ja/Nein kollidiert mit Footer „zufrieden?-Ja/Nein" — Filter
+- Wertentwicklung-Tab + Zeitraum-Dropdown sind Custom-Komponenten — mehrere Selektor-Strategien, bei Fail Trend=None
 
 ---
 
