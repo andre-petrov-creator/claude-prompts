@@ -33,7 +33,9 @@ export async function uploadFiles(input: UploadInput): Promise<UploadResult> {
         '@microsoft.graph.conflictBehavior': 'fail',
       });
   } catch (err: any) {
-    if (err?.statusCode !== 409) throw err;
+    if (err?.statusCode !== 409) {
+      throw new Error(`folder.create failed (status=${err?.statusCode}): ${err?.message || String(err)}`);
+    }
   }
 
   // Alle Files ueber createUploadSession (auch < 4 MB).
@@ -43,9 +45,14 @@ export async function uploadFiles(input: UploadInput): Promise<UploadResult> {
   // createUploadSession + direkter fetch-PUT bypasst das SDK und ist stabil.
   const uploaded: UploadResult['uploadedFiles'] = [];
   for (const file of input.files) {
-    const session = await client
-      .api(`${driveRoot}:${folderUrl}/${file.name}:/createUploadSession`)
-      .post({ item: { '@microsoft.graph.conflictBehavior': 'replace' } });
+    let session: any;
+    try {
+      session = await client
+        .api(`${driveRoot}:${folderUrl}/${file.name}:/createUploadSession`)
+        .post({ item: { '@microsoft.graph.conflictBehavior': 'replace' } });
+    } catch (err: any) {
+      throw new Error(`createUploadSession failed for ${file.name} (status=${err?.statusCode}): ${err?.message || String(err)} body=${JSON.stringify(err?.body || err?.response || {}).slice(0, 300)}`);
+    }
     const res = await fetch(session.uploadUrl, {
       method: 'PUT',
       headers: {
@@ -56,13 +63,18 @@ export async function uploadFiles(input: UploadInput): Promise<UploadResult> {
     });
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`Upload failed for ${file.name}: HTTP ${res.status} ${errText}`);
+      throw new Error(`fetch.PUT failed for ${file.name}: HTTP ${res.status} ${errText}`);
     }
     const item = (await res.json()) as { id: string };
     uploaded.push({ name: file.name, itemId: item.id, size: file.buffer.length });
   }
 
-  const folderItem = await client.api(`${driveRoot}:${folderUrl}`).get();
+  let folderItem: any;
+  try {
+    folderItem = await client.api(`${driveRoot}:${folderUrl}`).get();
+  } catch (err: any) {
+    throw new Error(`folderItem.get failed: ${err?.message || String(err)}`);
+  }
 
   return {
     folderPath: folderUrl,
