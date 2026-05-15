@@ -36,6 +36,15 @@ Wenn unsicher: **Akquise-Modus annehmen falls Ordnerpfad gegeben, sonst Orchestr
 2. `_meta.json` aus `<folder>` lesen → Header-Info (subject, from, files-Liste).
 3. PDFs aus `<folder>` listen — alles mit Endung `.pdf`.
 4. Pro PDF: `Read` aufrufen oder PDF-Skill nutzen → Textinhalt.
+5. Falls `body.txt` im Ordner liegt: einlesen — enthält den Mail-Body-Text als sekundäre Quelle.
+
+**Adress-Priorisierung (sehr wichtig — gegen False-Positives):**
+
+- Objektadresse kommt **PRIMÄR** aus dem Exposé-PDF.
+- `body.txt` ist nur Sekundär-Quelle für Plausibilitäts-Check oder als Fallback, wenn das PDF keine Adresse hergibt.
+- Maklerfirma-Adressen aus Signaturen, Footern, Disclaimer-Blöcken im Body (z.B. "Mit freundlichen Grüßen, Max Müller, Müller Immobilien GmbH, Hauptstraße 1, 45525 Hattingen, info@mueller.de") dürfen **NIEMALS** als Objektadresse verwendet werden.
+- Sender-Email (`_meta.json.from`) wird **ausschließlich** für die Kontakt-Erstellung benutzt, **nie** für Objekt-Identifikation.
+- Im Zweifel: Adresse leer lassen + Markdown-Hinweis "Adresse nicht eindeutig erkennbar — manuelle Prüfung". Lieber kein Lead als ein falscher Lead.
 
 **B. Generalisierten Datensatz extrahieren (LLM-intern)**
 

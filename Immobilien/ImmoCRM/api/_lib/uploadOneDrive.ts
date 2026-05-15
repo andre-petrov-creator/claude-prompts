@@ -40,6 +40,7 @@ export async function uploadFiles(input: UploadInput): Promise<UploadResult> {
     if (file.buffer.length < 4 * 1024 * 1024) {
       const item = await client
         .api(`${driveRoot}:${folderUrl}/${file.name}:/content`)
+        .headers({ 'Content-Type': file.contentType || 'application/octet-stream' })
         .put(file.buffer);
       uploaded.push({ name: file.name, itemId: item.id, size: file.buffer.length });
     } else {

@@ -75,6 +75,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const uploadInput = [
       ...allFiles,
+      ...(mail.text
+        ? [{
+            name: 'body.txt',
+            buffer: Buffer.from(mail.text, 'utf8'),
+            contentType: 'text/plain; charset=utf-8',
+          }]
+        : []),
       {
         name: '_meta.json',
         buffer: Buffer.from(JSON.stringify(meta, null, 2)),
