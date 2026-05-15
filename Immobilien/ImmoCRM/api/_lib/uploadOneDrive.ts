@@ -2,7 +2,8 @@ import { graphClient, getMailbox, getLocalPathPrefix } from './msGraphClient.js'
 
 // BASE muss als Ordnerkette im OneDrive-Mailbox-Drive bereits existieren.
 // Pipeline legt nur den inbox-Unterordner an, nicht die Basis-Hierarchie.
-const BASE = process.env.ONEDRIVE_BASE_PATH || '/Immobilien/001_AQUISE/_inbox';
+// Hartcodiert: ENV-Override war Pre-Pivot-Falle (Folder landete in Objekte/).
+const BASE = '/Immobilien/001_AQUISE/_inbox';
 
 export interface UploadInput {
   folderName: string;
