@@ -15,7 +15,7 @@
 |---|---|---|---|
 | 1 ✅ | Projektstruktur + Meta-Files | CLAUDE.md, GUIDELINES, README, /docs | — |
 | 2 ✅ | venv + Dependencies | Eigenständige Python-Umgebung | 1 |
-| 3 | Framework: `core/datensatz.py` | GeneralisierterDatensatz portiert + Tests | 2 |
+| 3 ✅ | Framework: `core/datensatz.py` | GeneralisierterDatensatz portiert + Tests | 2 |
 | 4 | Framework: `core/parsers.py` + `core/modals.py` | Euro/Trend/Ampel + Modal-Helpers + Tests | 3 |
 | 5 | Framework: `core/browser.py`, `cookies.py`, `inputs.py`, `radios.py`, `selects.py`, `submit.py`, `reader.py` | Playwright-Helpers, parametrisiert | 4 |
 | 6 | Framework: `core/portal_base.py` + `core/runner.py` | Abstrakte Portal-Klasse + Generic-Runner | 5 |
@@ -104,8 +104,8 @@ Schritte als Kontext nutzen.
 laufen.
 
 **Akzeptanzkriterium:**
-- [ ] `core/datensatz.py` vorhanden, importierbar als `from core.datensatz import GeneralisierterDatensatz`
-- [ ] 7+ Unit-Tests grün (round_half_up, avg_zimmer, from_summary, from_lists, garage_50_percent, invalid_zustand, list_mismatch)
+- [x] `core/datensatz.py` vorhanden, importierbar als `from core.datensatz import GeneralisierterDatensatz`
+- [x] 14 Unit-Tests grün (round_half_up ×3, avg_zimmer ×3, from_summary ×2, from_lists, garage_50_percent, invalid_zustand, invalid_ausstattung, list_mismatch, constants_exported)
 
 **Betroffene Dateien:**
 - Neu: `core/__init__.py`
