@@ -112,9 +112,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error && err.stack ? err.stack.slice(0, 1500) : '';
+    console.error('process error', msg, '\n', stack);
     await supa
       .from('mail_queue')
-      .update({ status: 'error', error_msg: msg })
+      .update({ status: 'error', error_msg: msg + (stack ? '\n--- stack ---\n' + stack : '') })
       .eq('message_id', messageId);
     res.status(500).json({ ok: false, error: msg });
   }
