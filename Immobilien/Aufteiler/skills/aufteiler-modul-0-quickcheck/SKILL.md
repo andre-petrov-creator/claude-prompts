@@ -173,7 +173,8 @@ Pflicht-Felder aus `.env` (vom Watcher übergeben): `SUPABASE_URL`, `SUPABASE_SE
 1. `POST /rest/v1/contacts` (Email-Upsert via `Prefer: resolution=merge-duplicates,return=representation`)
    - Felder: `name`, `email`, `phone`/`company`/`position` falls aus Mail-From extrahierbar
 2. `POST /rest/v1/deals`
-   - Felder: `label=<slug>`, `priority_score`, `priority_reason=<short>`, `inbox_message_id`, `expose_local_path=<onedrive-pfad>`, `expose_url=<onedrive-weburl-falls-vorhanden>`, `workspace_path=<pfad-zur-workspace-datei>`, `expose_source='mail-pipeline'`, `status='pre_screened'`, `contact_id=<aus-step-1>`
+   - Felder: `address=<strasse + hausnummer>`, `city=<ort>`, `zip=<plz>`, `priority_score`, `priority_reason=<short>`, `inbox_message_id`, `expose_local_path=<onedrive-pfad>`, `expose_url=<onedrive-weburl-falls-vorhanden>`, `workspace_path=<pfad-zur-workspace-datei>`, `expose_source='mail-pipeline'`, `status='pre_screened'`, `contact_id=<aus-step-1>`, `preis_kauf=<angebotspreis_eur>`, `einheiten=<anzahl_we>`, `wohnflaeche_m2=<summe-aus-wohnflaechen_qm-falls-vorhanden>`
+   - Schema-Hinweis: `deals`-Tabelle hat **kein `label`-Feld** (Stand 2026-05-15). Primärer Identifier ist `address` + `city` + `zip`. Bei fehlender Adresse aus PDF: Adresse leer lassen, Status bleibt `pre_screened`, User identifiziert manuell.
 3. `POST /rest/v1/activity_log`
    - `activity_type='new_lead'`, `deal_id`, `contact_id`, `payload={source,priority_score,priority_reason}`
 4. `PATCH /rest/v1/mail_queue?message_id=eq.<id>`

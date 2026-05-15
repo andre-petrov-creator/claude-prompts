@@ -83,7 +83,9 @@ try {
       # Prompt via stdin (statt positional) — sonst schluckt `--add-dir <directories...>` (variadic)
       # den Prompt als zweites Directory. Stdin-Pipe schliesst gleichzeitig den stdin-Wait-Block.
       # --add-dir gibt Sandbox-Zugriff auf das Aufteiler-Repo (CHECK24-Tool, Skill-Junctions).
-      $claudeOutput = $prompt | & claude --print --permission-mode acceptEdits --add-dir "c:\meine-projekte\Immobilien\Aufteiler" 2>&1
+      # --allowedTools erlaubt Bash (fuer CHECK24-Python-Aufruf + curl Supabase REST)
+      # + Standard-File-Ops ohne Permission-Frage im headless Mode.
+      $claudeOutput = $prompt | & claude --print --permission-mode acceptEdits --allowedTools "Bash Read Write Edit Glob Grep" --add-dir "c:\meine-projekte\Immobilien\Aufteiler" 2>&1
       $exitCode = $LASTEXITCODE
       $claudeOutput | Out-File -FilePath $logFile -Append -Encoding utf8
 
