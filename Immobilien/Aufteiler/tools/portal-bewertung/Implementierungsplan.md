@@ -22,7 +22,7 @@
 | 7 ⏳ | CHECK24-Migration: `portals/check24/` | Code portiert, Live-Lauf-Verifikation durch User offen | 6 |
 | 8 ⏳ | CLI: `m00_portal_pricer.py` (single-portal) | Code + argparse + JSON-Output, Live-Lauf offen | 7 |
 | 9 | Cleanup: alte `tools/check24/` löschen | Nur ein Code-Pfad für CHECK24 | 8 |
-| 10 | Inspector-Tool: `inspectors/inspect_dom.py` | Generischer DOM-Dumper für neue Portale | 8 |
+| 10 ✅ | Inspector-Tool: `inspectors/inspect_dom.py` | Generischer DOM-Dumper für neue Portale | 8 |
 | 11 | LLM-Recovery: `core/llm_recovery.py` + `core/selectors_store.py` | Selektor-Recovery via Anthropic-API, persistiert | 8 |
 | 12 | Neues Portal: Homeday Preisatlas | Erstes Portal nach Framework, beweist Wiederverwendbarkeit | 10, 11 |
 | 13 | Neues Portal: Interhyp | Zweites neues Portal | 12 |
@@ -311,10 +311,11 @@ Inputs/Selects/Buttons/Cookie-Banner-Texte ausliest. Spart Zeit beim
 manuellen Setup neuer Portale.
 
 **Akzeptanzkriterium:**
-- [ ] `inspectors/inspect_dom.py <URL>` läuft headless, klickt Cookie-Banner
-  (best-effort), dumpt JSON mit Inputs/Selects/Radios/Submits +
-  Screenshots
-- [ ] `inspectors/README.md` erklärt Aufruf + Output-Format
+- [x] `inspectors/inspect_dom.py <URL>` läuft headless, klickt Cookie-Banner
+  (best-effort), dumpt JSON mit Inputs/Selects/Radios/Buttons +
+  Screenshot
+- [x] `inspectors/README.md` erklärt Aufruf + Output-Format
+- [x] `docs/neue-portale.md` mit Schritt-für-Schritt-Anleitung (8 Steps)
 
 **Betroffene Dateien:**
 - Neu: `inspectors/inspect_dom.py`
