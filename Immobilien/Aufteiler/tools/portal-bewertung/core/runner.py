@@ -107,8 +107,11 @@ def run_with_page(
         _screenshot(page, f"{portal.NAME}_after_fill", runs_dir)
 
         current_step = "submit"
-        wait_for_enabled_submit(page, portal.SUBMIT_SELECTOR, max_wait_s=60)
-        click_submit(page, portal.SUBMIT_SELECTOR)
+        if portal.SUBMIT_SELECTOR:
+            wait_for_enabled_submit(page, portal.SUBMIT_SELECTOR, max_wait_s=60)
+            click_submit(page, portal.SUBMIT_SELECTOR)
+        else:
+            log(f"[{portal.NAME}] Kein SUBMIT_SELECTOR — Submit-Step übersprungen.")
 
         current_step = "post_submit_modals"
         portal.dismiss_post_submit_modals(page)
@@ -139,29 +142,37 @@ def run_with_page(
         label = build_trend_label(
             marktwert=marktwert, trends=trends, ampel=ampel, ampel_label=ampel_label
         )
+        extra = portal.extract_extra(body_text, page) or {}
+
+        has_marktwert = marktwert["mittel"] is not None
+        has_extra = any(v is not None for v in extra.values()) if extra else False
 
         shot = _screenshot(
             page,
-            f"{portal.NAME}_result_{'ok' if marktwert['mittel'] else 'empty'}",
+            f"{portal.NAME}_result_{'ok' if (has_marktwert or has_extra) else 'empty'}",
             runs_dir,
         )
 
-        if marktwert["mittel"] is None:
+        if not has_marktwert and not has_extra:
             return RunResult(
                 status="error",
                 portal=portal.NAME,
                 url=getattr(page, "url", portal.START_URL),
                 timestamp=started,
                 screenshot_path=str(shot) if shot else None,
-                error_code="marktwert_empty",
-                error_message="Kein Marktwert im Result-Frame-Text gefunden",
+                error_code="result_empty",
+                error_message="Weder Marktwert noch Portal-Extras im Body-Text gefunden",
                 raw_text_excerpt=body_text[:600],
+                extra=extra,
             )
 
-        log(
-            f"[{portal.NAME}] Marktwert={marktwert['mittel']:,} €, "
-            f"Trends={trends}, Ampel={ampel}".replace(",", ".")
-        )
+        if has_marktwert:
+            log(
+                f"[{portal.NAME}] Marktwert={marktwert['mittel']:,} €, "
+                f"Trends={trends}, Ampel={ampel}".replace(",", ".")
+            )
+        else:
+            log(f"[{portal.NAME}] Kein klassischer Marktwert, extras={list(extra.keys())}")
 
         return RunResult(
             status="ok",
@@ -170,13 +181,14 @@ def run_with_page(
             marktwert_eur_max=marktwert["max"],
             marktwert_eur_mittel=marktwert["mittel"],
             trends=trends,
-            trend_ampel=ampel,
-            trend_ampel_label=ampel_label,
-            trend_label=label,
+            trend_ampel=ampel if has_marktwert else None,
+            trend_ampel_label=ampel_label if has_marktwert else None,
+            trend_label=label if has_marktwert else None,
             url=getattr(page, "url", portal.START_URL),
             timestamp=started,
             screenshot_path=str(shot) if shot else None,
             raw_text_excerpt=body_text[:600],
+            extra=extra,
         )
 
     except Exception as e:

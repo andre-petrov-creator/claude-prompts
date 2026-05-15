@@ -24,7 +24,7 @@
 | 9 | Cleanup: alte `tools/check24/` löschen | Nur ein Code-Pfad für CHECK24 | 8 |
 | 10 ✅ | Inspector-Tool: `inspectors/inspect_dom.py` | Generischer DOM-Dumper für neue Portale | 8 |
 | 11 ⏳ | LLM-Recovery: `core/llm_recovery.py` + `core/selectors_store.py` | Module fertig + 10 Tests, Runner-Auto-Integration + Live-Bruchprobe offen | 8 |
-| 12 | Neues Portal: Homeday Preisatlas | Erstes Portal nach Framework, beweist Wiederverwendbarkeit | 10, 11 |
+| 12 ⏳ | Neues Portal: Homeday Preisatlas | Adapter fertig + 26 Tests; Live-Lauf-Verifikation durch User offen | 10, 11 |
 | 13 | Neues Portal: Interhyp | Zweites neues Portal | 12 |
 | 14 | Neues Portal: ImmobilienScout24 | Drittes neues Portal (höchstes Anti-Bot-Risiko) | 13 |
 | 15 | Orchestrator + `--alle` Modus | Parallel-Aufruf, Konsens-Median | 14 |
@@ -382,10 +382,14 @@ Wiederverwendbarkeit.
 - User-Hinweise: Captcha? E-Mail-Zwang? Anti-Bot-Verhalten beobachtet?
 
 **Akzeptanzkriterium:**
-- [ ] `portals/homeday/selectors.py` + `portals/homeday/portal.py` existieren
-- [ ] Live-Lauf mit Prosperstr. 59 → plausibler Marktwert (±20% vom
-  CHECK24-Wert)
-- [ ] CLI: `python m00_portal_pricer.py --portal homeday ...` läuft
+- [x] `portals/homeday/selectors.py` + `portals/homeday/parsers.py` + `portals/homeday/portal.py` existieren
+- [x] Cookie-Banner-Selektor: Cookiebot-`<a>` mit ID (live verifiziert)
+- [x] Deep-Link statt Form-Filling (`SUBMIT_SELECTOR=""`, Runner skippt Submit-Step)
+- [x] Schema-Erweiterung: `RunResult.extra` mit eur_per_qm, wohnblock_wohnlage, wohnblock_farbe_hex, trend_12m_stadt/wohnblock_pct + Ampeln
+- [x] Ampel-Logik nach User-Vorgabe (grün > +1%, gelb |x|≤1%, rot < -1%, grau bei `—`)
+- [x] CLI-Registry um `homeday` erweitert
+- [x] 26 Unit-Tests grün (16 Parser + 6 URL + 4 Smoke)
+- [ ] **Offen (Live-Verifikation durch User):** `--portal homeday --strasse "Prosperstraße" --hausnr 59 ...` läuft end-to-end gegen echte Site
 
 **Betroffene Dateien:**
 - Neu: `portals/homeday/`

@@ -46,9 +46,11 @@ from core.runner import run  # noqa: E402
 
 # Portal-Dispatcher: NAME → Klasse. Weitere Portale werden hier registriert.
 from portals.check24.portal import Check24Portal  # noqa: E402
+from portals.homeday.portal import HomedayPortal  # noqa: E402
 
 PORTAL_REGISTRY: dict[str, type[PortalBase]] = {
     "check24": Check24Portal,
+    "homeday": HomedayPortal,
 }
 
 

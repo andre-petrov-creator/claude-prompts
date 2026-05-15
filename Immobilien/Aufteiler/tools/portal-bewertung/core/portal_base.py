@@ -44,6 +44,7 @@ class RunResult:
     error_code: Optional[str] = None
     error_message: Optional[str] = None
     raw_text_excerpt: Optional[str] = None
+    extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -65,6 +66,8 @@ class RunResult:
             out["error_message"] = self.error_message
         if self.raw_text_excerpt is not None:
             out["raw_text_excerpt"] = self.raw_text_excerpt
+        if self.extra:
+            out["extra"] = self.extra
         return out
 
     def to_json(self) -> str:
@@ -103,5 +106,13 @@ class PortalBase:
         """Hook für portal-spezifische Trend-Farben aus dem DOM.
 
         Default: leeres Dict (keine DOM-Override für `trend_ampel`).
+        """
+        return {}
+
+    def extract_extra(self, body_text: str, page: Any) -> dict[str, Any]:
+        """Hook für portal-spezifische Zusatz-Felder, die NICHT ins Standard-Schema
+        passen (z.B. Homeday €/m² + Wohnlage). Landet im `RunResult.extra`-Slot.
+
+        Default: leeres Dict.
         """
         return {}
