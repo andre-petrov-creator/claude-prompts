@@ -45,7 +45,7 @@ export async function uploadFiles(input: UploadInput): Promise<UploadResult> {
   for (const file of input.files) {
     const session = await client
       .api(`${driveRoot}:${folderUrl}/${file.name}:/createUploadSession`)
-      .post({ '@microsoft.graph.conflictBehavior': 'replace' });
+      .post({ item: { '@microsoft.graph.conflictBehavior': 'replace' } });
     const res = await fetch(session.uploadUrl, {
       method: 'PUT',
       headers: {
