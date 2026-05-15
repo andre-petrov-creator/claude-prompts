@@ -808,9 +808,19 @@ Lokaler PowerShell-Watcher (Windows Task Scheduler mit `At log on` + `Every 1 mi
 
 ### Offene Punkte für nächste Session
 
-1. **Watcher braucht `--allowedTools "Bash Read Write Edit Glob Grep"`** — aktuell `--permission-mode acceptEdits` erlaubt File-Operationen, aber blockt Bash-Calls (CHECK24-Tool-Aufruf). Skill steigt aktuell mit *"CHECK24-Tool-Command erfordert Bestätigung"* aus.
-2. **`deals`-Schema-Check** — Skill-Anweisung referenziert `label`-Spalte, die in DB nicht existiert (`column deals.label does not exist`). Korrektes Feld vermutlich `objekt_slug` oder neue Migration.
-3. **Phase 2** (siehe Brainstorming-Prompt am Ende von `plans/2026-05-15-akquise-pipeline-local-watcher-final.md`): KI-Klassifikation der Anhänge, Bilder-/Unterlagen-Sub-Ordner, Link-Pipeline mit Playwright-Scraping (HTML-Exposé, Diashow-Bilder, Drucken-Button-PDF).
+**Erledigt am 2026-05-15 abend (Update zum ADR):**
+
+- ✓ **Watcher `--allowedTools "Bash Read Write Edit Glob Grep"`** ergänzt → Skill darf Bash + Standard-Tools ohne Permission-Prompt nutzen (commit `99d95e4`).
+- ✓ **`deals`-Schema-Match** → Skill nutzt jetzt `address` / `city` / `zip` (primärer Identifier, kein `label`) plus `preis_kauf`, `einheiten`, `wohnflaeche_m2`. Schema-Hinweis im Skill ergänzt (commit `99d95e4`).
+- ✓ **`akquise-watcher/.env`** mit echten Supabase-Werten gefüllt (war nur Placeholder) → Skill kann jetzt PostgREST-Inserts machen. Datei bleibt gitignored.
+
+**Technischer Beweis Skill-Run (2026-05-15 14:04):** Skill hat aus echter Test-Mail Adresse, Baujahr, WE-Zahl, Wohnfläche, Angebotspreis, Maklerin-Daten korrekt extrahiert. MD5-Match-Erkennung gegen existierenden Aufteiler-Ordner funktioniert.
+
+**Noch offen für nächste Session / Phase 2:**
+
+1. **Duplikat-Handling im Akquise-Modus** — bei MD5-Match oder Adress-Match gegen existierenden `Objekte/<slug>/`-Ordner soll der Skill autonom entscheiden (z.B. Mail-Ordner als `_mail_<datum>_<msg-id>/` ins existierende Objekt einsortieren, kein Duplikat-Lead, mail_queue.status='done' mit Note). Aktuell fragt Skill *"Welche Option?"* — `claude --print` ist aber nicht-interaktiv → Skill exittet ohne Aktion.
+2. **Phase 2** (siehe Brainstorming-Prompt am Ende von `plans/2026-05-15-akquise-pipeline-local-watcher-final.md`): KI-Klassifikation der Anhänge, Bilder-/Unterlagen-Sub-Ordner, Link-Pipeline mit Playwright-Scraping (HTML-Exposé, Diashow-Bilder, Drucken-Button-PDF).
+3. **Echter Lead-Insert** mit nicht-Duplikat-Mail noch nicht live verifiziert (Test-Mail war Re-Forward des bekannten Prosperstr-Exposés). Wird beim nächsten echten Akquise-Mail-Eingang automatisch passieren.
 
 ### Referenzen
 
