@@ -50,6 +50,7 @@ Dieses Repo ist die **einzige Quelle der Wahrheit** für Skills, State-Schema un
 - **Keine Auto-Exports.** Modul 5 (PDF) läuft nur auf explizite User-Anfrage, nie als Teil der Vollanalyse-Sequenz.
 - **Freigabe-Pflicht zwischen Modulen.** Orchestrator wartet auf `go`/`weiter`/`ja`/`ok`, bevor das nächste Modul geladen wird.
 - **Versionierung sichtbar im Skill.** Inhaltliche Änderung = Anpassung der Beschreibung im Frontmatter + ggf. Versions-Hinweis am Body-Ende.
+- **Dual-Mode-Skill `aufteiler-modul-0-quickcheck`.** Läuft in zwei Modi (siehe SKILL.md Abschnitt 0): (a) Orchestrator-Modus (vom aufteiler-Skill aufgerufen, state.json + AskUserQuestion); (b) Akquise-Modus (vom lokalen Akquise-Watcher in ImmoCRM-Pipeline aufgerufen, Ordnerpfad mit PDFs als Eingabe, CHECK24-Tool als Marktwert-Quelle). Bei Änderungen an der Berechnungs-Logik (Abschnitt 3) sicherstellen, dass beide Modi korrekt durchlaufen. Verifikation: lokaler Modul-2-Lauf (Orchestrator-Modus) UND lokaler Akquise-Pipeline-Lauf (Akquise-Modus) — beide grün.
 
 ## Konventionen
 
