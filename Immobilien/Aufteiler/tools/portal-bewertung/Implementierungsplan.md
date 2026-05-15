@@ -20,7 +20,7 @@
 | 5 ✅ | Framework: `core/browser.py`, `cookies.py`, `inputs.py`, `radios.py`, `selects.py`, `submit.py`, `reader.py` | Playwright-Helpers, parametrisiert | 4 |
 | 6 ✅ | Framework: `core/portal_base.py` + `core/runner.py` | Abstrakte Portal-Klasse + Generic-Runner | 5 |
 | 7 ⏳ | CHECK24-Migration: `portals/check24/` | Code portiert, Live-Lauf-Verifikation durch User offen | 6 |
-| 8 | CLI: `m00_portal_pricer.py` (single-portal) | `--portal check24` läuft end-to-end | 7 |
+| 8 ⏳ | CLI: `m00_portal_pricer.py` (single-portal) | Code + argparse + JSON-Output, Live-Lauf offen | 7 |
 | 9 | Cleanup: alte `tools/check24/` löschen | Nur ein Code-Pfad für CHECK24 | 8 |
 | 10 | Inspector-Tool: `inspectors/inspect_dom.py` | Generischer DOM-Dumper für neue Portale | 8 |
 | 11 | LLM-Recovery: `core/llm_recovery.py` + `core/selectors_store.py` | Selektor-Recovery via Anthropic-API, persistiert | 8 |
@@ -259,11 +259,12 @@ Check24Portal-Adapter ausführt. Identische Argumente wie
 `tools/m00_check24_pricer.py`.
 
 **Akzeptanzkriterium:**
-- [ ] `python m00_portal_pricer.py --portal check24 --strasse "..."
-  --hausnr 59 ... --headless` läuft durch
-- [ ] JSON auf stdout, identisches Schema wie altes Tool
-- [ ] `--verbose` schaltet Diagnose-Logs ein (auf stderr)
-- [ ] Exit 0 bei Erfolg, 1 bei Fehler
+- [x] `m00_portal_pricer.py` mit argparse, Mode A (`--datensatz JSON`) + Mode B (CLI-Args), Portal-Registry
+- [x] JSON auf stdout (UTF-8-reconfigured), `--verbose` auf stderr
+- [x] Exit 0/1 nach `result.status`
+- [x] 6 CLI-Smoke-Tests grün (Import, Reject unknown portal, Mode A+B, List-Length-Check)
+- [x] `--help` zeigt vollständige Argument-Liste
+- [ ] **Offen (Live-Verifikation durch User):** `--portal check24 --headless` läuft end-to-end gegen echte Site
 
 **Betroffene Dateien:**
 - Neu: `m00_portal_pricer.py`
