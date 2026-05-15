@@ -23,7 +23,7 @@
 | 8 ⏳ | CLI: `m00_portal_pricer.py` (single-portal) | Code + argparse + JSON-Output, Live-Lauf offen | 7 |
 | 9 | Cleanup: alte `tools/check24/` löschen | Nur ein Code-Pfad für CHECK24 | 8 |
 | 10 ✅ | Inspector-Tool: `inspectors/inspect_dom.py` | Generischer DOM-Dumper für neue Portale | 8 |
-| 11 | LLM-Recovery: `core/llm_recovery.py` + `core/selectors_store.py` | Selektor-Recovery via Anthropic-API, persistiert | 8 |
+| 11 ⏳ | LLM-Recovery: `core/llm_recovery.py` + `core/selectors_store.py` | Module fertig + 10 Tests, Runner-Auto-Integration + Live-Bruchprobe offen | 8 |
 | 12 | Neues Portal: Homeday Preisatlas | Erstes Portal nach Framework, beweist Wiederverwendbarkeit | 10, 11 |
 | 13 | Neues Portal: Interhyp | Zweites neues Portal | 12 |
 | 14 | Neues Portal: ImmobilienScout24 | Drittes neues Portal (höchstes Anti-Bot-Risiko) | 13 |
@@ -339,16 +339,16 @@ mit DOM-Dump + Screenshot, kriegt neuen Selektor, persistiert ihn pro
 Portal.
 
 **Akzeptanzkriterium:**
-- [ ] `core/llm_recovery.py`: `recover_selector(page, failed_selector,
-  intent, portal_name)` ruft Claude Sonnet 4.6 mit DOM + Screenshot
-- [ ] `core/selectors_store.py`: `load_learned_selectors(portal_name)`,
-  `save_learned_selector(portal_name, intent, selector)` — JSON-Datei
-  unter `learned_selectors/<portal>.json`
-- [ ] `core/runner.py` integriert: bei Selektor-Fail wird automatisch
-  Recovery getriggert
-- [ ] Manuelle Bruchprobe: künstlich falscher CHECK24-Cookie-Selektor →
-  Recovery findet richtigen → wird persistiert → 2. Lauf nutzt
-  gelernten Selektor direkt
+- [x] `core/llm_recovery.py`: `recover_selector(page, failed_selector,
+  intent, portal_name, client=None)` ruft Claude Sonnet 4.6 mit DOM-Dump
+- [x] `core/selectors_store.py`: `load_learned_selectors`,
+  `save_learned_selector` — JSON-Datei unter `learned_selectors/<portal>.json`
+- [x] 10 Unit-Tests grün (mit mocked Anthropic-Client + tmp_path-Fixture)
+- [ ] **Offen (Folge-Arbeit):** `core/runner.py` integriert — bei Selektor-Fail
+  automatisch Recovery (siehe docs/llm-recovery.md "Bekannte Limitierungen")
+- [ ] **Offen (User-Verifikation):** Manuelle Bruchprobe — künstlich falscher
+  CHECK24-Cookie-Selektor → Recovery findet richtigen → persistiert → 2. Lauf
+  nutzt gelernten Selektor
 
 **Betroffene Dateien:**
 - Neu: `core/llm_recovery.py`
