@@ -36,30 +36,30 @@ export async function uploadFiles(input: UploadInput): Promise<UploadResult> {
     if (err?.statusCode !== 409) throw err;
   }
 
+  // Alle Files ueber createUploadSession (auch < 4 MB).
+  // Der SDK-direkte .put(buffer)-Pfad zum :/content-Endpoint hatte
+  // Content-Type-Quirks ("Unable to read JSON request payload" /
+  // "Entity only allows writes with a JSON Content-Type header").
+  // createUploadSession + direkter fetch-PUT bypasst das SDK und ist stabil.
   const uploaded: UploadResult['uploadedFiles'] = [];
   for (const file of input.files) {
-    if (file.buffer.length < 4 * 1024 * 1024) {
-      const item = await client
-        .api(`${driveRoot}:${folderUrl}/${file.name}:/content`)
-        .headers({ 'Content-Type': file.contentType || 'application/octet-stream' })
-        .put(file.buffer);
-      uploaded.push({ name: file.name, itemId: item.id, size: file.buffer.length });
-    } else {
-      const session = await client
-        .api(`${driveRoot}:${folderUrl}/${file.name}:/createUploadSession`)
-        .post({ '@microsoft.graph.conflictBehavior': 'replace' });
-      const res = await fetch(session.uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Length': String(file.buffer.length),
-          'Content-Range': `bytes 0-${file.buffer.length - 1}/${file.buffer.length}`,
-        },
-        body: new Uint8Array(file.buffer),
-      });
-      if (!res.ok) throw new Error(`Upload-Session-PUT failed: ${res.status}`);
-      const item = (await res.json()) as { id: string };
-      uploaded.push({ name: file.name, itemId: item.id, size: file.buffer.length });
+    const session = await client
+      .api(`${driveRoot}:${folderUrl}/${file.name}:/createUploadSession`)
+      .post({ '@microsoft.graph.conflictBehavior': 'replace' });
+    const res = await fetch(session.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Length': String(file.buffer.length),
+        'Content-Range': `bytes 0-${file.buffer.length - 1}/${file.buffer.length}`,
+      },
+      body: new Uint8Array(file.buffer),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Upload failed for ${file.name}: HTTP ${res.status} ${errText}`);
     }
+    const item = (await res.json()) as { id: string };
+    uploaded.push({ name: file.name, itemId: item.id, size: file.buffer.length });
   }
 
   const folderItem = await client.api(`${driveRoot}:${folderUrl}`).get();
