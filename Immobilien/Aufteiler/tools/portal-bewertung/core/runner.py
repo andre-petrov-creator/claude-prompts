@@ -18,7 +18,6 @@ from core.datensatz import GeneralisierterDatensatz
 from core.log import log, set_verbose
 from core.parsers import (
     build_trend_label,
-    parse_marktwert_block,
     parse_trends,
     trend_ampel,
 )
@@ -135,7 +134,7 @@ def run_with_page(
         if not body_text:
             body_text = read_page_body_deep(page)
 
-        marktwert = parse_marktwert_block(body_text)
+        marktwert = portal.parse_marktwert(body_text, page)
         trends = parse_trends(body_text)
         dom_colors = portal.extract_dom_colors(page)
         ampel, ampel_label = trend_ampel(trends, dom_colors=dom_colors or None)

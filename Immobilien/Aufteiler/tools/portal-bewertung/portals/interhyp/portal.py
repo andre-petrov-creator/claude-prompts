@@ -4,12 +4,13 @@ Architektur: 9-Schritt-Wizard, der vom Adapter selbst durchgeklickt wird
 (fill_form). Nach 'Ergebnisse anzeigen' liegt das Resultat im Hauptdokument
 (kein iframe). Marktwert + EUR/m² werden aus dem Zusammenfassung-Tab geparst.
 
-Output: Standard-Marktwert-Felder (min/mittel/max) bleiben None (Homeday-
-Pattern). Alle Interhyp-Werte liegen im RunResult.extra-Slot:
-  - marktwert_eur_min/mittel/max (Zusammenfassung-Range)
-  - eur_per_qm (zur gewaehlten Ausstattung) + eur_per_qm_einfach/gehoben/luxus
-  - marktwert_einfach_eur/gehoben_eur/luxus_eur
-  - ausstattung_klasse_gewaehlt
+Output:
+- Standard-Schema (Top-Level via parse_marktwert-Override):
+    marktwert_eur_min/mittel/max — Schätzwert + Range
+- RunResult.extra (Interhyp-spezifisch):
+    eur_per_qm (zur gewaehlten Ausstattung) + eur_per_qm_einfach/gehoben/luxus
+    marktwert_einfach_eur/gehoben_eur/luxus_eur
+    ausstattung_klasse_gewaehlt
 
 Trend-Auswertung wurde bewusst ausgeklammert — Modul 0 / Modul 5 nutzen
 falls noetig externe Trend-Quellen (z.B. CHECK24-3J-Trend).
@@ -256,13 +257,22 @@ class InterhypPortal(PortalBase):
         """Keine Post-Submit-Modals bei Interhyp."""
         return None
 
-    def extract_extra(self, body_text: str, page: Any) -> dict[str, Any]:
-        """Parst Marktwert + EUR/m² + Ausstattungs-Tabelle aus dem
-        Zusammenfassung-Tab-Body. Trend-Auswertung wurde aus dem Adapter
-        entfernt — Modul 0 / Modul 5 nutzen falls noetig externe Trend-Quellen
-        (z.B. CHECK24-3J-Trend).
+    def parse_marktwert(
+        self, body_text: str, page: Any
+    ) -> dict[str, Optional[int]]:
+        """Interhyp-spezifischer Marktwert-Parser (Schätzwert + Range).
+
+        Anders als CHECK24 ('Marktwert ... 173.000 €') liefert Interhyp das
+        Range-Layout 'Untergrenze\\nObergrenze\\nSchätzwert *\\nMittel'.
         """
-        marktwert = parse_marktwert_interhyp(body_text)
+        return parse_marktwert_interhyp(body_text)
+
+    def extract_extra(self, body_text: str, page: Any) -> dict[str, Any]:
+        """Parst EUR/m² + Ausstattungs-Tabelle aus dem Zusammenfassung-Tab-Body.
+
+        Marktwert-Min/Mittel/Max liegen im Standard-Schema-Top-Level
+        (siehe parse_marktwert). Hier nur die Interhyp-spezifischen Extras.
+        """
         eur_per_qm = parse_eur_per_qm_by_ausstattung(body_text)
         marktwert_by_klasse = parse_marktwert_by_ausstattung(body_text)
 
@@ -270,9 +280,6 @@ class InterhypPortal(PortalBase):
         chosen_eur_per_qm = eur_per_qm.get(klasse)
 
         return {
-            "marktwert_eur_min": marktwert["min"],
-            "marktwert_eur_mittel": marktwert["mittel"],
-            "marktwert_eur_max": marktwert["max"],
             "eur_per_qm": chosen_eur_per_qm,
             "eur_per_qm_einfach": eur_per_qm["einfach"],
             "eur_per_qm_gehoben": eur_per_qm["gehoben"],

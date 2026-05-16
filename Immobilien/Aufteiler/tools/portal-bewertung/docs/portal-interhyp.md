@@ -127,21 +127,22 @@ Beispiel Prosperstr. 59: Baujahr 1965, Dach 2020 → `sanierungsjahr_letztes=202
 
 Andere Adapter (CHECK24, Homeday) ignorieren das Feld.
 
-## Output-Schema (extra-Slot)
+## Output-Schema
+
+Marktwert-Felder sind im **Standard-Top-Level** (wie bei CHECK24), portal-
+spezifische Extras im `extra`-Slot. Realisiert über den `parse_marktwert`-
+Hook in PortalBase, den Interhyp überschreibt.
 
 ```json
 {
   "status": "ok",
   "portal": "interhyp",
-  "marktwert_eur_min": null,
-  "marktwert_eur_mittel": null,
-  "marktwert_eur_max": null,
+  "marktwert_eur_min": 140000,
+  "marktwert_eur_mittel": 162000,
+  "marktwert_eur_max": 198000,
   "trends": {"jahre_3": null, "jahr_1": null, "prognose": null},
-  "trend_ampel": null,
+  "trend_label": "Marktwert 140.000 – 198.000 € (Mittel 162.000 €) Trend …",
   "extra": {
-    "marktwert_eur_min": 140000,
-    "marktwert_eur_mittel": 162000,
-    "marktwert_eur_max": 198000,
     "eur_per_qm": 2025,
     "eur_per_qm_einfach": 2025,
     "eur_per_qm_gehoben": 2150,
@@ -154,9 +155,10 @@ Andere Adapter (CHECK24, Homeday) ignorieren das Feld.
 }
 ```
 
-**Wichtig**: Standard-`marktwert_eur_*`-Felder bleiben `null`. Modul 0 muss
-für Interhyp den Wert aus `extra.marktwert_eur_mittel` lesen (analog Homeday,
-das `extra.eur_per_qm * wohnflaeche` für Konsens nutzt).
+**Wichtig**: `marktwert_eur_mittel` = Interhyp-eigener **Schätzwert** (162.000),
+NICHT `eur_per_qm × wohnflaeche` (das wäre 162.000 ebenfalls, aber bei anderer
+Ausstattungs-Klasse oder anderen Inputs könnten beide Pfade abweichen — der
+Schätzwert ist Interhyp's offizielle Antwort).
 
 
 ## CLI-Aufruf

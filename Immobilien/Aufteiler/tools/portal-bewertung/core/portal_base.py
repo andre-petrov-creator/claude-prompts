@@ -116,3 +116,16 @@ class PortalBase:
         Default: leeres Dict.
         """
         return {}
+
+    def parse_marktwert(
+        self, body_text: str, page: Any
+    ) -> dict[str, Optional[int]]:
+        """Hook für Portal-spezifische Marktwert-Extraktion.
+
+        Default: nutzt `core.parsers.parse_marktwert_block` (CHECK24-Layout).
+        Subklassen mit anderem Body-Format (z.B. Interhyp) überschreiben mit
+        eigenem Parser. Returnt `{"min", "mittel", "max"}` (alle Optional[int]).
+        """
+        from core.parsers import parse_marktwert_block
+
+        return parse_marktwert_block(body_text)

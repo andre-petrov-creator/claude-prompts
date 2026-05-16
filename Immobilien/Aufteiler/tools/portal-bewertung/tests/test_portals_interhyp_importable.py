@@ -87,19 +87,23 @@ def test_interhyp_extract_extra_with_sample_body() -> None:
 
     portal = InterhypPortal()
     portal.ausstattung_klasse_gewaehlt = "einfach"
-    extra = portal.extract_extra(body, FakePage())
 
-    assert extra["marktwert_eur_min"] == 157000
-    assert extra["marktwert_eur_mittel"] == 183000
-    assert extra["marktwert_eur_max"] == 207000
+    # parse_marktwert override: Standard-Schema-Felder
+    mw = portal.parse_marktwert(body, FakePage())
+    assert mw == {"min": 157000, "mittel": 183000, "max": 207000}
+
+    # extract_extra: nur Interhyp-Extras, KEINE marktwert_eur_*-Felder mehr
+    extra = portal.extract_extra(body, FakePage())
+    assert "marktwert_eur_min" not in extra
+    assert "marktwert_eur_mittel" not in extra
+    assert "marktwert_eur_max" not in extra
     assert extra["eur_per_qm"] == 2288
     assert extra["eur_per_qm_gehoben"] == 2425
     assert extra["eur_per_qm_luxus"] == 2688
     assert extra["marktwert_einfach_eur"] == 183000
     assert extra["ausstattung_klasse_gewaehlt"] == "einfach"
-    # Keine Trend-Felder mehr im Schema
+    # Keine Trend-Felder
     assert "trend_2j_richtung" not in extra
-    assert "trend_2j_ampel" not in extra
     assert "wertentwicklung_pct" not in extra
 
 
