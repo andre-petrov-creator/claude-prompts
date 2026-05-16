@@ -3,14 +3,19 @@
 ## Zweck
 
 Interhyp liefert für eine Adresse einen **Marktwert** (Untergrenze, Schätzwert,
-Obergrenze) plus **EUR/m²** je Ausstattungsklasse (Einfach, Gehoben, Luxus)
-plus einen **2-Jahres-Wertentwicklungstrend** im Wertentwicklung-Tab.
+Obergrenze) plus **EUR/m²** je Ausstattungsklasse (Einfach, Gehoben, Luxus).
 
 Anders als CHECK24 (Pipe-Format, iframe) und Homeday (Deep-Link, kein
 Marktwert) hat Interhyp einen **9-Schritt-Wizard**, der vom Adapter komplett
 durchgeklickt wird (kein Deep-Link). Output: alle Interhyp-Werte landen im
 `RunResult.extra`-Slot (Homeday-Pattern), die Standard-Marktwert-Felder
 bleiben `null`.
+
+**Hinweis zur Trend-Auswertung:** Die Wertentwicklungs-Linie (Wertentwicklung-Tab)
+wird **bewusst nicht** ausgewertet — die letzten 2 Jahre des Charts sind
+schwer programmatisch zu interpretieren (Material-UI-Dropdown nicht zuverlässig
+klickbar, SVG-Heuristik unscharf). Modul 0 / Modul 5 nutzen falls nötig
+externe Trend-Quellen (z.B. CHECK24-3J-Trend).
 
 ## Files
 
@@ -78,38 +83,18 @@ Fallback auf den ersten Vorschlag mit der Straße.
 | 8 | Ausstattung | „Einfach" / „Gehoben" / „Luxus" (Auto-Advance, Mapping aus Datensatz) |
 | 9 | Weitere Ausstattung | Parkplatz wenn `hat_garage OR hat_aussenstellplatz`; Submit |
 
-### 4. 2-Jahres-Trend via SVG-Path-Daten (kein %-Wert)
+### 4. Keine Trend-Auswertung im Adapter
 
-User-Anforderung: **simple Ampel** (steigt/stagniert/fällt) ohne Prozent-Angaben.
-Quelle: visuelle Auswertung des Wertentwicklungs-Chart-Verlaufs der letzten 2 Jahre.
+Die Wertentwicklungs-Linie (Wertentwicklung-Tab) wird vom Adapter **nicht**
+gelesen. Hintergründe:
+- Der Zeitraum-Dropdown ist ein Material-UI-Custom-Element ohne stabilen
+  Selektor — automatisches Umschalten auf „2 Jahre" greift nicht zuverlässig.
+- SVG-Path-Heuristiken (Y-Bewegung der letzten 20 % der Datenpunkte) liefern
+  unscharfe Ergebnisse je nach Highcharts-Default-Zeitraum.
 
-Implementierung: nach Klick auf Wertentwicklung-Tab werden die SVG-Path-Daten
-(`<path class="highcharts-graph" d="M x y L x y …">`) extrahiert. Algorithmus:
-
-1. Wertentwicklungs-Tab klicken (Multi-Strategie: `[role="tab"]`, `a`, `button`, `label`, `div`)
-2. Container des Charts via Anchor-Text "Marktwert YYYY" finden (filtert andere Tabs aus,
-   z.B. Preiskarte mit eigenem Chart)
-3. Innerhalb des Containers alle `path.highcharts-graph` holen, längsten Pfad nehmen
-   (= Berechnete-Immobilie-Linie mit interpolierten Datenpunkten)
-4. `parse_svg_path_points` extrahiert (x, y)-Paare aus dem `d`-String
-5. `classify_trend_richtung` nimmt die letzten 20 % der Punkte (≈ letzte 2 Jahre bei
-   10-J-Default-Zeitraum), vergleicht Y_start mit Y_end gegen 2 % des Gesamt-Y-Range
-   (Mindest-Threshold 2 Pixel)
-6. SVG-invertiert: Y wird kleiner = Linie geht nach oben = Preis steigt
-
-**Output-Felder** im `extra`-Slot:
-- `trend_2j_richtung`: `"steigt"` | `"stagniert"` | `"faellt"` | `None`
-- `trend_2j_ampel`: `"gruen"` | `"gelb"` | `"rot"` | `"grau"`
-- `trend_2j_ampel_label`: `"steigt"` | `"stagniert"` | `"faellt"` | `"— (keine Daten)"`
-
-Bei Klick-Fehler oder zu wenig Daten: `trend_2j_richtung = None`, Ampel = „grau",
-Adapter bleibt funktional.
-
-**Hinweis zur 20-%-Annahme**: Highcharts zeichnet bei einem 10-J-Default-Zeitraum
-ungefähr linear interpolierte Monatsdaten. Die letzten 20 % entsprechen ≈ den
-letzten 2 Jahren. Wenn der Default-Zeitraum sich ändert (z.B. 5 Jahre statt 10),
-wäre die Annahme anders — das ist eine bekannte Heuristik-Limitation, dokumentiert
-in `inspectors/probe_interhyp_chart.py`.
+Trend-Information liefern statt dessen die anderen Portale (CHECK24: 3J/1J/Prognose
+mit konkreten %-Werten; Homeday: 12M-Trend Stadt + Wohnblock). Modul 0 nutzt
+diese, Interhyp bleibt reiner Marktwert-Lieferant.
 
 ### 5. Ausstattung-Mapping
 
@@ -164,10 +149,7 @@ Andere Adapter (CHECK24, Homeday) ignorieren das Feld.
     "marktwert_einfach_eur": 162000,
     "marktwert_gehoben_eur": 172000,
     "marktwert_luxus_eur": 191000,
-    "ausstattung_klasse_gewaehlt": "einfach",
-    "trend_2j_richtung": "faellt",
-    "trend_2j_ampel": "rot",
-    "trend_2j_ampel_label": "faellt"
+    "ausstattung_klasse_gewaehlt": "einfach"
   }
 }
 ```
@@ -176,17 +158,6 @@ Andere Adapter (CHECK24, Homeday) ignorieren das Feld.
 für Interhyp den Wert aus `extra.marktwert_eur_mittel` lesen (analog Homeday,
 das `extra.eur_per_qm * wohnflaeche` für Konsens nutzt).
 
-## Ampel-Logik (2-Jahres-Trend, simple Richtung)
-
-| Richtung | Ampel | Label |
-|---|---|---|
-| `steigt` | grün | „steigt" |
-| `stagniert` | gelb | „stagniert" |
-| `faellt` | rot | „faellt" |
-| `None` | grau | „— (keine Daten)" |
-
-User-Anforderung: simple Ampel ohne Prozent-Angaben — die visuelle Auswertung
-des Chart-Verlaufs der letzten 2 Jahre reicht aus.
 
 ## CLI-Aufruf
 
@@ -222,16 +193,11 @@ Ausstattung normal → Einfach):** (Stand End-to-End-Lauf 2026-05-15)
 - `extra.marktwert_eur_min/mittel/max` = 140.000 / 162.000 / 198.000 €
 - `extra.eur_per_qm_einfach` = 2.025 €/m²
 - `extra.marktwert_einfach/gehoben/luxus_eur` = 162k / 172k / 191k
-- `extra.trend_2j_richtung` = `"faellt"` (Ampel rot)
 
 **Erwartung (gleiche Adresse MIT Sanierungsjahr 2020, im Sparring-Lauf
 gesehen):**
 - `extra.marktwert_eur_min/mittel/max` = 157.000 / 183.000 / 207.000 €
 - `extra.eur_per_qm_einfach` = 2.288 €/m²
-
-**Hinweis**: Trend-Richtung kann sich je nach Eingabe-Daten (mit/ohne
-Sanierung) und Marktdynamik unterscheiden. Wert ist die echte
-Interhyp-DOM-Antwort, nicht künstliche Annahme.
 
 ## Tests
 
@@ -239,20 +205,14 @@ Interhyp-DOM-Antwort, nicht künstliche Annahme.
 pytest tests/test_portals_interhyp_*.py -v
 ```
 
-**39 Tests:**
-- 34 Parser-Logik (`test_portals_interhyp_parsers.py`)
+**Tests:**
+- Parser-Logik (`test_portals_interhyp_parsers.py`)
   - Marktwert-Min/Mittel/Max (5 Tests, inkl. Live-Layout + partial-Match)
   - EUR/m² je Ausstattungsklasse (3 Tests, inkl. Live-Layout)
   - Marktwert je Ausstattungsklasse (3 Tests, inkl. Live-Layout)
-  - Trend-2J% (4 Tests, Legacy für Übergang)
-  - Ampel-Logik klassisch (5 Tests: grün, gelb, rot, grau, Threshold)
-  - SVG-Path-Parsing (3 Tests: simple/real/invalid)
-  - `classify_trend_richtung` (5 Tests: steigt, faellt, stagniert-flat, stagniert-below-threshold, last-fraction-only)
-  - `trend_ampel_from_richtung` (4 Tests: steigt/stagniert/faellt/None)
-  - 2 weitere Parser-Tests
 - 5 Smoke (`test_portals_interhyp_importable.py`)
   - Importierbarkeit + PortalBase-Subklasse
   - Selectors-Konstanten vollständig
   - PORTAL_REGISTRY enthält interhyp
-  - `extract_extra` liefert erwartete Keys aus Sample-Body
+  - `extract_extra` liefert erwartete Keys aus Sample-Body (ohne Trend-Felder)
   - GeneralisierterDatensatz-Feld `sanierungsjahr_letztes` existiert

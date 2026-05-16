@@ -22,8 +22,6 @@ def test_interhyp_selectors_exposes_required_constants() -> None:
     assert sel.START_URL.startswith("https://")
     assert isinstance(sel.COOKIE_ACCEPT_CANDIDATES, list)
     assert sel.SUBMIT_TEXT_WIZARD == "Ergebnisse anzeigen"
-    assert sel.TAB_WERTENTWICKLUNG == "Wertentwicklung"
-    assert sel.ZEITRAUM_2J_OPTION == "2 Jahre"
     # Mapping muss alle gueltigen Ausstattungs-Werte abdecken
     for value in ("einfach", "normal", "gehoben", "luxus"):
         assert value in sel.STEP8_AUSSTATTUNG_MAP
@@ -99,10 +97,10 @@ def test_interhyp_extract_extra_with_sample_body() -> None:
     assert extra["eur_per_qm_luxus"] == 2688
     assert extra["marktwert_einfach_eur"] == 183000
     assert extra["ausstattung_klasse_gewaehlt"] == "einfach"
-    # Trend ist None bei FakePage; Ampel = 'grau'
-    assert extra["trend_2j_richtung"] is None
-    assert extra["trend_2j_ampel"] == "grau"
-    assert "keine Daten" in extra["trend_2j_ampel_label"]
+    # Keine Trend-Felder mehr im Schema
+    assert "trend_2j_richtung" not in extra
+    assert "trend_2j_ampel" not in extra
+    assert "wertentwicklung_pct" not in extra
 
 
 def test_interhyp_datensatz_field_sanierungsjahr_letztes_exists() -> None:

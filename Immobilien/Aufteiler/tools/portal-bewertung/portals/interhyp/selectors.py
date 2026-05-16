@@ -40,9 +40,6 @@ STEP8_AUSSTATTUNG_MAP: dict[str, str] = {
 }
 
 SUBMIT_TEXT_WIZARD = "Ergebnisse anzeigen"
-TAB_WERTENTWICKLUNG = "Wertentwicklung"
-ZEITRAUM_LABEL = "Zeitraum"
-ZEITRAUM_2J_OPTION = "2 Jahre"
 
 # Body-Text-Marker, gegen den die Adapter-Logik die Ergebnis-Seite verifiziert
 RESULT_BODY_MARKER = "Schätzwert"

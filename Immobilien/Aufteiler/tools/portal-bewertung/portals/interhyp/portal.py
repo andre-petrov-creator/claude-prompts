@@ -2,9 +2,7 @@
 
 Architektur: 9-Schritt-Wizard, der vom Adapter selbst durchgeklickt wird
 (fill_form). Nach 'Ergebnisse anzeigen' liegt das Resultat im Hauptdokument
-(kein iframe). Marktwert + EUR/m² werden aus dem Zusammenfassung-Tab geparst;
-der 2-Jahres-Trend wird durch separaten Klick auf den Wertentwicklung-Tab
-geholt.
+(kein iframe). Marktwert + EUR/m² werden aus dem Zusammenfassung-Tab geparst.
 
 Output: Standard-Marktwert-Felder (min/mittel/max) bleiben None (Homeday-
 Pattern). Alle Interhyp-Werte liegen im RunResult.extra-Slot:
@@ -12,7 +10,9 @@ Pattern). Alle Interhyp-Werte liegen im RunResult.extra-Slot:
   - eur_per_qm (zur gewaehlten Ausstattung) + eur_per_qm_einfach/gehoben/luxus
   - marktwert_einfach_eur/gehoben_eur/luxus_eur
   - ausstattung_klasse_gewaehlt
-  - trend_2j_pct, trend_2j_ampel, trend_2j_ampel_label
+
+Trend-Auswertung wurde bewusst ausgeklammert — Modul 0 / Modul 5 nutzen
+falls noetig externe Trend-Quellen (z.B. CHECK24-3J-Trend).
 
 Live-Lauf: siehe docs/portal-interhyp.md.
 """
@@ -25,12 +25,9 @@ from core.portal_base import PortalBase, RunConfig
 
 from . import selectors as sel
 from .parsers import (
-    classify_trend_richtung,
     parse_eur_per_qm_by_ausstattung,
     parse_marktwert_by_ausstattung,
     parse_marktwert_interhyp,
-    parse_svg_path_points,
-    trend_ampel_from_richtung,
 )
 
 
@@ -260,11 +257,10 @@ class InterhypPortal(PortalBase):
         return None
 
     def extract_extra(self, body_text: str, page: Any) -> dict[str, Any]:
-        """Parst alle Interhyp-Werte ins extra-Dict.
-
-        1. Marktwert-Range + EUR/m² + Ausstattungs-Tabelle aus dem
-           Zusammenfassung-Tab-Body
-        2. Wertentwicklung-Tab + SVG-Path-Auswertung fuer 2-J-Trend-Richtung
+        """Parst Marktwert + EUR/m² + Ausstattungs-Tabelle aus dem
+        Zusammenfassung-Tab-Body. Trend-Auswertung wurde aus dem Adapter
+        entfernt — Modul 0 / Modul 5 nutzen falls noetig externe Trend-Quellen
+        (z.B. CHECK24-3J-Trend).
         """
         marktwert = parse_marktwert_interhyp(body_text)
         eur_per_qm = parse_eur_per_qm_by_ausstattung(body_text)
@@ -272,9 +268,6 @@ class InterhypPortal(PortalBase):
 
         klasse = self.ausstattung_klasse_gewaehlt or "einfach"
         chosen_eur_per_qm = eur_per_qm.get(klasse)
-
-        richtung = _read_trend_2j_via_svg(page)
-        ampel, ampel_label = trend_ampel_from_richtung(richtung)
 
         return {
             "marktwert_eur_min": marktwert["min"],
@@ -288,91 +281,6 @@ class InterhypPortal(PortalBase):
             "marktwert_gehoben_eur": marktwert_by_klasse["gehoben"],
             "marktwert_luxus_eur": marktwert_by_klasse["luxus"],
             "ausstattung_klasse_gewaehlt": klasse,
-            "trend_2j_richtung": richtung,
-            "trend_2j_ampel": ampel,
-            "trend_2j_ampel_label": ampel_label,
         }
 
 
-_WERTENTWICKLUNG_TAB_SELECTORS = (
-    '[role="tab"]:has-text("Wertentwicklung")',
-    'button[role="tab"]:has-text("Wertentwicklung")',
-    'a[role="tab"]:has-text("Wertentwicklung")',
-    'a:has-text("Wertentwicklung")',
-    'button:has-text("Wertentwicklung")',
-    'label:has-text("Wertentwicklung")',
-    'div:has-text("Wertentwicklung"):not(:has(div))',
-)
-
-
-def _read_trend_2j_via_svg(page: Any) -> Optional[str]:
-    """Liest die SVG-Path-Daten der Trend-Linie, klassifiziert Richtung der
-    letzten 2 Jahre als 'steigt' / 'stagniert' / 'faellt'.
-
-    Algorithmus:
-      1. Klick auf Wertentwicklung-Tab (Multi-Strategie)
-      2. Hole alle <path class="highcharts-graph">-Elemente
-      3. Wähle den Pfad mit den meisten Punkten (= Default-Zeitraum, 10 Jahre)
-      4. Parse 'M x y L x y L x y ...' zu (x,y)-Punkten
-      5. Letzte 20% der Punkte = letzte 2 Jahre (Highcharts zeichnet linear)
-      6. Vergleiche Y_start vs Y_end gegen 2% des Y-Range (SVG-invertiert)
-
-    Bei Fehler oder zu wenig Daten: None (Ampel wird grau).
-    """
-    try:
-        # Tab-Klick (Multi-Strategie)
-        clicked = False
-        for s in _WERTENTWICKLUNG_TAB_SELECTORS:
-            try:
-                loc = page.locator(s).first
-                if loc.count() > 0 and loc.is_visible():
-                    loc.click(timeout=2_000)
-                    clicked = True
-                    break
-            except Exception:
-                continue
-        if not clicked:
-            return None
-        page.wait_for_timeout(3_000)
-
-        # Lokalisiere den Wertentwicklungs-Chart-Container via 'Marktwert YYYY'-Anker
-        # (die andere Charts auf der Seite — z.B. Preiskarte — matchen das nicht)
-        paths_d = page.evaluate(
-            """
-            () => {
-                let containers = Array.from(document.querySelectorAll('[role="tabpanel"]'))
-                    .filter(p => !p.hidden && window.getComputedStyle(p).display !== 'none');
-                if (containers.length === 0) {
-                    const heading = Array.from(document.querySelectorAll('*'))
-                        .find(el => /Marktwert\\s+\\d{4}/.test(el.textContent || ''));
-                    if (heading) {
-                        let el = heading;
-                        for (let i = 0; i < 10; i++) {
-                            el = el.parentElement;
-                            if (!el) break;
-                            if (el.querySelector('svg path.highcharts-graph')) {
-                                containers = [el];
-                                break;
-                            }
-                        }
-                    }
-                }
-                const found = containers.length > 0
-                    ? containers.flatMap(c => Array.from(c.querySelectorAll('path.highcharts-graph')))
-                    : Array.from(document.querySelectorAll('path.highcharts-graph'));
-                return found
-                    .map(p => p.getAttribute('d') || '')
-                    .filter(d => d.length > 100);
-            }
-            """
-        )
-        if not paths_d:
-            return None
-
-        # Pfad mit den meisten Punkten = Berechnete-Immobilie-Linie
-        # (mehr Datenpunkte als die Ø-Linie wegen Interpolation)
-        path_d = max(paths_d, key=len)
-        points = parse_svg_path_points(path_d)
-        return classify_trend_richtung(points)
-    except Exception:
-        return None
