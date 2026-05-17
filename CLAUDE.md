@@ -77,6 +77,29 @@ ggf. `check_cost` / `get_credits` aufrufen.
 
 ---
 
+## Pending Setup auf PC (lokal ausführen)
+
+Diese Schritte gehen **nicht** auf Claude-Code-Web (kein `/plugin`,
+kein lokales MCP-Setup). Beim nächsten Start von Claude Code auf dem PC
+abarbeiten:
+
+1. **Plugin: `obra/superpowers`** (vom User am 2026-05-17 angefordert)
+   ```
+   /plugin marketplace add obra/superpowers
+   /plugin install superpowers@obra/superpowers
+   ```
+   Danach `/plugin` öffnen und prüfen, dass „superpowers" als installed
+   gelistet ist. Bei Erfolg: diesen Eintrag hier entfernen.
+
+2. **Higgsfield MCP einbinden** (siehe Abschnitt oben), sobald Bild-/
+   Videogenerierung gebraucht wird.
+
+> **Hinweis für Claude:** Wenn dieser Abschnitt beim Session-Start auf
+> dem PC sichtbar ist und Punkte offen sind → User aktiv darauf
+> hinweisen und Ausführung anbieten.
+
+---
+
 ## Update-Regel
 
 Bei jeder Änderung an Tool-Setup, MCP-Servern oder projektübergreifenden
