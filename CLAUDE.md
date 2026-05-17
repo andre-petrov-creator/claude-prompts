@@ -81,22 +81,86 @@ ggf. `check_cost` / `get_credits` aufrufen.
 
 Diese Schritte gehen **nicht** auf Claude-Code-Web (kein `/plugin`,
 kein lokales MCP-Setup). Beim nächsten Start von Claude Code auf dem PC
-abarbeiten:
+**alle vier Plugins installieren**, dann diesen Abschnitt entfernen:
 
-1. **Plugin: `obra/superpowers`** (vom User am 2026-05-17 angefordert)
+1. **superpowers** (obra/superpowers)
    ```
    /plugin marketplace add obra/superpowers
-   /plugin install superpowers@obra/superpowers
+   /plugin install superpowers@obra-superpowers
    ```
-   Danach `/plugin` öffnen und prüfen, dass „superpowers" als installed
-   gelistet ist. Bei Erfolg: diesen Eintrag hier entfernen.
 
-2. **Higgsfield MCP einbinden** (siehe Abschnitt oben), sobald Bild-/
+2. **ui-ux-pro-max** (nextlevelbuilder/ui-ux-pro-max-skill)
+   ```
+   /plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill
+   /plugin install ui-ux-pro-max
+   ```
+
+3. **claude-mem**
+   ```
+   /plugin install claude-mem
+   ```
+   (Falls Marketplace fehlt: User fragen, aus welchem Marketplace,
+   ggf. vorher `/plugin marketplace add <…>` ausführen.)
+
+4. **differential-review**
+   ```
+   /plugin install differential-review
+   ```
+   (Gleiche Anmerkung wie bei claude-mem.)
+
+5. **Higgsfield MCP einbinden** (siehe Abschnitt oben), sobald Bild-/
    Videogenerierung gebraucht wird.
+
+Nach Install: `/plugin` öffnen, prüfen dass alle vier als installed
+gelistet sind. Erfolgreich installierte Punkte aus dieser Liste
+entfernen.
 
 > **Hinweis für Claude:** Wenn dieser Abschnitt beim Session-Start auf
 > dem PC sichtbar ist und Punkte offen sind → User aktiv darauf
-> hinweisen und Ausführung anbieten.
+> hinweisen und Ausführung anbieten. **Erst nach erfolgreicher
+> Installation** den Abschnitt „Skill-/Plugin-Auto-Nutzung" unten als
+> Standard-Verhaltensregeln befolgen.
+
+---
+
+## Skill-/Plugin-Auto-Nutzung (wann zieht Claude was eigenständig)
+
+Diese Regeln gelten projektübergreifend und legen fest, **wann** Claude
+ohne explizite Aufforderung auf einen Skill oder ein Plugin
+zurückgreift. Wenn ein Skill nicht installiert ist → User darauf
+hinweisen statt schweigend selbst zu improvisieren.
+
+### Higgsfield MCP — Bild & Video
+Trigger und Verhalten siehe Abschnitt „Higgsfield MCP" oben.
+
+### ui-ux-pro-max — Design / UI / UX
+**Trigger:** Sobald irgendetwas mit **Design, UI, UX, Layout, Mockup,
+Screen, Komponente, Farbschema, visuelles Konzept, Landing-Page,
+Figma-Übernahme** o. Ä. aufkommt — egal in welchem Projekt.
+
+**Verhalten:**
+1. Skill `ui-ux-pro-max` aktivieren.
+2. **Den User fragen, welches Design-System / welchen Stil er will**
+   (z. B. „shadcn/zinc minimal", „Apple-Style", „Brutalist",
+   „Glassmorphism", „bestehendes Brand-System X übernehmen"), bevor
+   irgendetwas generiert oder gecodet wird.
+3. Erst nach Antwort umsetzen.
+
+### superpowers — allgemeine Power-Tools
+Trigger noch nicht festgelegt. User soll nach Install entscheiden,
+wofür der Skill standardmäßig anspringen darf. TODO: Trigger hier
+ergänzen, sobald der Skill genutzt wurde.
+
+### claude-mem — Memory / Persistenz
+Trigger noch nicht festgelegt. TODO: definieren, sobald installiert.
+
+### differential-review — Code-Review
+Vermutlicher Trigger: vor jedem Commit / vor jedem Push / vor PR-
+Erstellung Diff-Review laufen lassen. TODO: bestätigen nach Install.
+
+> **Pflege-Regel:** Sobald ein neuer Skill / Plugin / MCP-Server dazu
+> kommt → hier Trigger und Verhalten ergänzen. Diese Sektion ist die
+> Single Source of Truth für „wann zieht Claude was".
 
 ---
 
