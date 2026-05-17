@@ -140,6 +140,23 @@ kein lokales MCP-Setup). Beim nächsten Start von Claude Code auf dem PC
    Claude-Code-Fenster auf dem PC öffnen, OneDrive durchsuchen,
    beide Felder ausfüllen).
 
+7. **Marketplace: `anthropics/skills`**
+   ```
+   /plugin marketplace add anthropics/skills
+   ```
+   Danach `/plugin` öffnen und schauen, welche offiziellen
+   Anthropic-Skills relevant sind — die interessanten installieren
+   und hier dokumentieren.
+
+8. **Skill: `gstack`** (Garry Tan, via Git-Clone, kein Marketplace)
+   ```
+   git clone https://github.com/garrytan/gstack.git ~/.claude/skills/gstack
+   cd ~/.claude/skills/gstack && ./setup
+   ```
+   Nach dem Setup prüfen, ob der Skill in `/skills` auftaucht. Trigger
+   und Verwendung anschließend im Abschnitt „Skill-/Plugin-Auto-
+   Nutzung" eintragen.
+
 Nach Install: `/plugin` öffnen, prüfen dass alle vier als installed
 gelistet sind. Erfolgreich installierte Punkte aus dieser Liste
 entfernen.
