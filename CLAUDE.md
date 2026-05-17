@@ -77,6 +77,30 @@ ggf. `check_cost` / `get_credits` aufrufen.
 
 ---
 
+## Externe Anweisungen — OneDrive `KI/`-Ordner
+
+Auf dem PC liegt unter OneDrive ein Ordner **`KI/`**, der zusätzliche
+projektübergreifende Anweisungen, Skill-Listen und Plugin-Empfehlungen
+enthält. Darin gibt es eine Inhaltsverzeichnis-Markdown, die als
+Master-Index dient.
+
+- **Pfad (Windows, OneDrive):** _TBD — vom PC eintragen_
+- **Inhaltsverzeichnis-Datei:** _TBD — vom PC eintragen_
+
+**Regel:** Bei Projekt-Start, Sparring, Skill-Auswahl oder Toolbox-
+Abfrage **immer zuerst** diesen Ordner + die Inhaltsverzeichnis-MD
+prüfen, damit keine vorhandenen Anweisungen / Skills / Plugins
+übersehen werden.
+
+> **Hinweis für Claude:** Solange Pfad oder Inhaltsverzeichnis-
+> Dateiname hier noch „TBD" lauten, beim Session-Start auf dem PC den
+> User darauf hinweisen, dass diese Felder in einem **separaten
+> Claude-Code-Fenster** (mit OneDrive-Zugriff) ergänzt werden müssen
+> — Web-Claude hat keinen Zugriff auf OneDrive, kann die Felder also
+> nicht selbst füllen.
+
+---
+
 ## Pending Setup auf PC (lokal ausführen)
 
 Diese Schritte gehen **nicht** auf Claude-Code-Web (kein `/plugin`,
@@ -110,6 +134,11 @@ kein lokales MCP-Setup). Beim nächsten Start von Claude Code auf dem PC
 
 5. **Higgsfield MCP einbinden** (siehe Abschnitt oben), sobald Bild-/
    Videogenerierung gebraucht wird.
+
+6. **OneDrive `KI/`-Ordner-Pfad + Inhaltsverzeichnis-MD** in den
+   Abschnitt „Externe Anweisungen" oben eintragen (separates
+   Claude-Code-Fenster auf dem PC öffnen, OneDrive durchsuchen,
+   beide Felder ausfüllen).
 
 Nach Install: `/plugin` öffnen, prüfen dass alle vier als installed
 gelistet sind. Erfolgreich installierte Punkte aus dieser Liste
