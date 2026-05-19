@@ -73,7 +73,46 @@ Typische Klärungsfelder:
 - UI-Scope (welche Screens MVP, was später)
 - Deployment (lokal, Vercel, Selbst-Hosting)
 
-### Schritt 1.4, Outputs sichern
+### Schritt 1.4, Tool-/Skill-/Plugin-Inventur & Empfehlung
+
+**Zwingender Schritt, bevor der Implementierungsplan geschrieben wird.** Sobald der Scope steht, prüft Claude die vorhandene Toolbox und schlägt explizit vor, was für das konkrete Projekt genutzt werden soll. Ziel: keine vorhandenen Skills / Plugins / MCP-Server / Anweisungen übersehen, keine doppelte Arbeit, keine „hätte ich gewusst, dass es das schon gibt"-Momente.
+
+**Quellen, die Claude in dieser Reihenfolge prüft:**
+
+1. **OneDrive-`KI/`-Ordner mit Inhaltsverzeichnis-MD**
+   Pfad: `C:\Users\andre\OneDrive - APPV Personalvermittlung\KI\Prompt´s_Anweisungen\Anleitungen Guides\`
+   → Index-/Inhaltsverzeichnis-MD lesen (Dateiname steht im Root-`CLAUDE.md` von `meine-projekte`). Enthält projektübergreifende Anweisungen, Skill-Listen, Prompt-Snippets, Plugin-Empfehlungen, externe Tool-Recherchen.
+2. **Root-`CLAUDE.md`** des Mono-Repos `meine-projekte/` → MCP-Server (z. B. Higgsfield), Skill-/Plugin-Auto-Nutzungsregeln, allgemeine Anweisungen.
+3. **Pro-Projekt-`CLAUDE.md`** in `meine-projekte/<projekt>/` falls Themen-Nähe besteht.
+4. **`~/.claude/skills/`** → lokal installierte Skills (inkl. Junctions aus `meine-projekte/skills/`).
+5. **Installierte Plugins** (`/plugin` → liste anzeigen).
+6. **Konfigurierte MCP-Server** (Claude-Code-Settings).
+
+**Pflicht-Output dieses Schritts:**
+
+```markdown
+## Empfohlene Skills / Plugins / Tools / MCP-Server
+
+### Aus vorhandener Toolbox (sofort nutzbar)
+- `<skill-name>` — wofür im Projekt
+- `<plugin-name>` — wofür im Projekt
+- `<mcp-server>` — wofür im Projekt
+
+### Aus OneDrive KI-Index relevant
+- `<eintrag>` — kurze Notiz, warum für dieses Projekt nützlich
+
+### Empfohlen zusätzlich zu installieren
+- `<skill/plugin>` — Quelle (Marketplace/Git), wofür, geschätzte Kosten/Aufwand
+
+### Bewusst nicht genutzt
+- `<thing>` — Begründung (z. B. „Overkill für MVP", „passt nicht zum Stack")
+```
+
+**Verhalten bei Lücken:** Wenn etwas fehlt, das offensichtlich helfen würde → Claude schlägt aktiv vor, es zu installieren, statt es zu improvisieren. User entscheidet pro Vorschlag.
+
+**Hinweis:** Solange im Root-`CLAUDE.md` der OneDrive-Inhaltsverzeichnis-Dateiname noch „TBD" lautet, Claude den User darauf hinweisen und ggf. anbieten, in einem separaten Claude-Code-Fenster mit OneDrive-Zugriff die Datei zu identifizieren und einzutragen, bevor die Inventur abgeschlossen wird.
+
+### Schritt 1.5, Outputs sichern
 
 Am Ende der Sparring-Session liefert Claude:
 
@@ -82,7 +121,7 @@ Am Ende der Sparring-Session liefert Claude:
 - Tech-Stack
 - Funktionsumfang MVP vs. Later
 - Architekturentscheidungen mit Begründung
-- Skill-Referenzen (welche installierten Skills relevant sind)
+- **Empfohlene Skills / Plugins / Tools / MCP-Server** (Output aus Schritt 1.4)
 
 **Implementierungsplan.md**, enthält:
 - Schritt 1: Projektstruktur, CLAUDE.md, /docs anlegen
@@ -317,7 +356,8 @@ Wenn der User sagt "ich will ein neues Projekt aufsetzen" oder ähnliches:
 1. Frage zuerst was er bauen will, für wen, mit welchem Stack. Drei Fragen reichen erstmal.
 2. Wenn unklar: Interview-Modus, max 3 Fragen pro Runde, bauen erst nach explizitem Go.
 3. Wenn klar: Sparring-Prompt aus Phase 1.2 anpassen und gemeinsam durchgehen.
-4. Liefere am Ende der Sparring-Session beide Markdown-Files (Projektbeschreibung, Implementierungsplan) als saubere Artefakte.
-5. Pro Schritt im Plan: Pattern aus Phase 3 anwenden.
+4. **Sobald der Scope steht: Schritt 1.4 (Tool-/Skill-/Plugin-Inventur) durchführen — nie überspringen.** Bestehende Toolbox (OneDrive `KI/`, Root-`CLAUDE.md`, `~/.claude/skills`, Plugins, MCP-Server) prüfen und Empfehlungen liefern, bevor der Implementierungsplan geschrieben wird.
+5. Liefere am Ende der Sparring-Session beide Markdown-Files (Projektbeschreibung inkl. Skill-/Plugin-Empfehlungen, Implementierungsplan) als saubere Artefakte.
+6. Pro Schritt im Plan: Pattern aus Phase 3 anwenden.
 
 Halte den User dran. Bei Topic-Switch oder Ablenkung kurz darauf hinweisen, aktuellen Schritt nennen, weiter.
