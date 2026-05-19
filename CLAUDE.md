@@ -84,7 +84,7 @@ projektübergreifende Anweisungen, Skill-Listen und Plugin-Empfehlungen
 enthält. Darin gibt es eine Inhaltsverzeichnis-Markdown, die als
 Master-Index dient.
 
-- **Pfad (Windows, OneDrive):** _TBD — vom PC eintragen_
+- **Pfad (Windows, OneDrive):** `C:\Users\andre\OneDrive - APPV Personalvermittlung\KI\Prompt´s_Anweisungen\Anleitungen Guides\`
 - **Inhaltsverzeichnis-Datei:** _TBD — vom PC eintragen_
 
 **Regel:** Bei Projekt-Start, Sparring, Skill-Auswahl oder Toolbox-
@@ -135,10 +135,11 @@ kein lokales MCP-Setup). Beim nächsten Start von Claude Code auf dem PC
 5. **Higgsfield MCP einbinden** (siehe Abschnitt oben), sobald Bild-/
    Videogenerierung gebraucht wird.
 
-6. **OneDrive `KI/`-Ordner-Pfad + Inhaltsverzeichnis-MD** in den
-   Abschnitt „Externe Anweisungen" oben eintragen (separates
-   Claude-Code-Fenster auf dem PC öffnen, OneDrive durchsuchen,
-   beide Felder ausfüllen).
+6. **OneDrive: Inhaltsverzeichnis-Dateiname** im Abschnitt „Externe
+   Anweisungen" oben ergänzen (Pfad ist schon eingetragen). Auf dem
+   PC `C:\Users\andre\OneDrive - APPV Personalvermittlung\KI\Prompt´s_Anweisungen\Anleitungen Guides\`
+   öffnen, Index-/Inhaltsverzeichnis-MD identifizieren, Dateiname
+   eintragen.
 
 7. **Marketplace: `anthropics/skills`**
    ```
