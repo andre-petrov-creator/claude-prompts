@@ -73,6 +73,41 @@ Käufer-Suchprofile · Investments-Tracking · Multi-User/Auth · Mobile App (PW
 
 ---
 
+## Kommunikation mit dem Owner (Pflicht — bei jedem Dialog)
+
+Owner ist kein Programmierer. Bei jedem Satz, den der Owner liest, gilt:
+
+**Verbotene Wörter ohne sofortige Erklärung in derselben Zeile:**
+
+- "Ordner-Hygiene", "Hygiene" → richtig: "die Dateien in passende Unterordner einsortieren"
+- "Downstream-Mehrwert", "downstream" → richtig: "wir nutzen das später für X" (mit konkretem X)
+- "State-Eintrag", "in den State schreiben" → richtig: "in die Datei `state.json` reinschreiben"
+- "Score-Anreicherung" → richtig: "der Lead bekommt mehr Punkte wenn X"
+- "Idempotenz" → richtig: "wenn der Skill 2x läuft, passiert nichts doppelt"
+- "Pipeline-Step" → richtig: "Schritt im Ablauf"
+- "Edge-Case" → richtig: "Sonderfall, der seltener vorkommt (z.B. ...)"
+- "Persistierung" → richtig: "abspeichern, damit es nach dem Skill-Ende noch da ist"
+- "Granular" → richtig: "fein aufgeteilt" / "grob aufgeteilt"
+- "Trade-off" allein → richtig: "Vorteil X, dafür Nachteil Y"
+
+**Pflicht-Check vor jeder AskUserQuestion:**
+
+1. Frage Wort für Wort durchgehen, jedes Tech-Wort markieren
+2. Tech-Wort ersetzen oder in derselben Zeile in einfachen Worten erklären
+3. Option-Labels: **maximal 5 Wörter Alltagssprache**, kein Englisch, keine Tech-Wörter
+4. Option-Beschreibung erklärt: was passiert + warum + konkrete Folgen (Sekunden, Euro, Aufwand)
+5. Eine Option pro Frage trägt **(Empfohlen)** am Ende des Labels — mit klarer 1-Satz-Begründung
+
+**Wenn Owner sagt "ich verstehe nicht" oder "erklär das anders":**
+- **Neu** erklären mit anderen Worten, nicht dieselben Begriffe noch mal
+- Vergleich mit Alltags-Beispiel hilft (Aktenordner statt Datenbank, Bilderrahmen statt UI-Komponente)
+
+**Verstärkung:**
+- Diese Regel wiederholt sich in jeder Spec-/Plan-Datei als erster Block ("User-Kommunikation")
+- Bei Subagent-Aufrufen: Subagent-Prompt enthält diese Regel
+
+---
+
 ## Git-Konventionen (siehe globale `~/.claude/CLAUDE.md`)
 
 - Commits nur auf User-Auftrag
