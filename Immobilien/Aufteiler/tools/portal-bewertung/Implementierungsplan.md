@@ -26,7 +26,7 @@
 | 11 ⏳ | LLM-Recovery: `core/llm_recovery.py` + `core/selectors_store.py` | Module fertig + 10 Tests, Runner-Auto-Integration + Live-Bruchprobe offen | 8 |
 | 12 ⏳ | Neues Portal: Homeday Preisatlas | Adapter fertig + 26 Tests; Live-Lauf-Verifikation durch User offen | 10, 11 |
 | 13 ⏳ | Neues Portal: Interhyp | Adapter fertig (Marktwert + €/m² je Ausstattung, keine Trend-Auswertung) + Tests + Live-Lauf; semantische User-Plausibilitätsprüfung offen | 12 |
-| 14 | Neues Portal: ImmobilienScout24 | Drittes neues Portal (höchstes Anti-Bot-Risiko) | 13 |
+| 14 | Neues Portal: Immometrica (statt IS24) | Paid-B2B-Portal mit Login, liefert Marktwert + Miete + Rendite + Marktstatistik | 13 |
 | 15 | Orchestrator + `--alle` Modus | Parallel-Aufruf, Konsens-Median | 14 |
 | 16 | Modul-0-Integration | Aufteiler-Skill ruft Portal-Bewertung, State-Update | 15 |
 | 17 | Modul-5-PDF-Integration | Portal-Werte im PDF-Report | 16 |
@@ -445,17 +445,60 @@ URL: https://www.interhyp.de/rechner/immobilienbewertung/
 
 ---
 
-## Schritt 14: Portal ImmobilienScout24
+## Schritt 14: Portal Immometrica (statt IS24)
 
-**Vorab (USER-INPUT NÖTIG):** Screenshot-Briefing wie Step 12.
+**Begründung für Wechsel von IS24 zu Immometrica** (Sparring 2026-05-17/19):
 
-URL: https://www.immobilienscout24.de/immobilie-bewerten/
+IS24 wurde komplett exploriert (Wizard durchklickbar, Selektoren alle bekannt,
+Usercentrics-CMP-Bypass via `#usercentrics-root.remove()` funktioniert). Aber:
+- Result-Seite hinter Login-Wand (SSO-Redirect nach Submit)
+- Anonymer API-Endpoint `/maklervergleich/valuation` liefert nur
+  **PLZ-Regional-Durchschnitt** (189k €), nicht den objekt-spezifischen Wert
+  (171k €, eingeloggt). Differenz 10% — für Konsens-Median unbrauchbar
+- Login-Scraping = Account-Sperr-Risiko ohne klaren Mehrwert
 
-**Akzeptanzkriterium:** Wie Step 12, mit `--portal immoscout24`.
+→ IS24 gestrichen, **Immometrica** als 4. Portal anvisiert:
+- Paid B2B (Investor-Pro 49,95 €/Monat, Einsteiger 34,95 €/Monat)
+- User hat Account → Login per Form-Automatisierung
+- Liefert nicht nur Marktwert, sondern auch **Miete + Rendite + Marktstatistik**
+  → Konsumiert Modul 0 + Modul 4 (Mietspiegel-Quervalidierung)
+
+**URL:** https://www.immometrica.com/de
+
+**Vorab (USER-INPUT NÖTIG):**
+- Account-Typ klären (Einsteiger / Investor / Investor Pro)
+- Bei Investor Pro: API-Key holen (ToS-konformer Weg)
+- Bei kleinerem Abo: Login-Daten in `.env`
+  (`IMMOMETRICA_USERNAME` + `IMMOMETRICA_PASSWORD` — vorhanden, Stand 2026-05-19)
+
+**Akzeptanzkriterium:**
+- [ ] `portals/immometrica/` analog Interhyp/Homeday
+- [ ] Login-Flow funktioniert (2-Step-Login möglich, siehe HANDOVER)
+- [ ] Adress-Suche liefert Marktwert + €/m² + Miete + Rendite via Network-Sniffer
+  ODER offizielle API
+- [ ] Daten landen im `RunResult.extra`-Slot:
+  `marktwert_eur_mittel`, `eur_per_qm`, `miete_eur_mittel`, `miete_eur_per_qm`,
+  `rendite_brutto_pct`, `mietprognose_pct_6m`, `marktangebote_kauf`, `marktangebote_miete`
+- [ ] Adress-Validierungs-Loop auf Result-Seite
+  (Memory: [[immoscout24-adresse-validierung]] — gilt analog)
+- [ ] PORTAL_REGISTRY um `immometrica` erweitert
+- [ ] Live-Lauf gegen echte Site → Werte plausibilisiert vs. Aufteiler-Standardcase
+  Prosperstr. 59 (Erwartung Marktwert 150k-220k, Miete ~700 €, Rendite ~5%)
 
 **Edge-Cases:**
-- IS24 nutzt Akamai Bot Manager — höchstes Risiko für Bot-Erkennung
-- Wenn Headless geblockt: Headed-Modus als Default für IS24
+- Login-Form ist 2-Step (Email zuerst, dann Passwort auf separater Seite) — Probe
+  ist hier am ersten Versuch gescheitert. Siehe `HANDOVER_step-14_immometrica.md`
+- Newsletter-Popup beim Initial-Load kann Login-Selektor verdecken
+- Modal-CMP (Cookie) muss vor Klicks dismissed werden
+- ToS-Risiko bei Scraping mit Login-Account: höchstens 1× pro Aufteiler-Lauf,
+  keine Bulk-Abfragen, keine festen Zeitfenster
+
+**Files (Stand 2026-05-19):**
+- `inspectors/probe_immometrica.py` (erstes Login-Probe, scheitert beim Passwort)
+- `runs/2026-05-19T0745*_immometrica_probe_*.png` (Screenshots Login-Modal/Newsletter)
+- `runs/2026-05-19T074558_immometrica_probe_network.json` (2 Einträge — wenig)
+- `.env` (Credentials) + `.env.example` (Vorlage)
+- `HANDOVER_step-14_immometrica.md` (Übergabe-Dokument, dieser Step)
 
 ---
 
