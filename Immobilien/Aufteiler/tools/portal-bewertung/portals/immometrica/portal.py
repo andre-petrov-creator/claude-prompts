@@ -343,8 +343,10 @@ async def _set_geo_via_api(tab, geo_query: str, expected_substring: str) -> tupl
 async def _enter_geo(tab, geo_query: str, expected_substring: str) -> bool:
     """Tippt geo_query in React-Select Ort-Eingabe + waehlt passenden Eintrag.
 
-    DOM: <input id="react-select-2-input"> mit React-controlled state.
-    Suggestions: <div id="react-select-2-option-N"> nach Tippen.
+    Timing aus probe_geo_input.py validiert:
+    - 0.3s Delay zwischen Chars (sonst API-Calls nicht getriggert)
+    - 4s Wait nach Eingabe (sonst Suggestions nicht voll geladen)
+    - Native click() auf Option-Element (synth click ignoriert React-Select)
     """
     try:
         # 1) Existing Tags loeschen
@@ -352,7 +354,7 @@ async def _enter_geo(tab, geo_query: str, expected_substring: str) -> bool:
         if cleared:
             print(f">>>   Ort-Tags entfernt: {cleared}",
                   file=sys.stderr, flush=True)
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(1.5)
 
         # 2) Auf "Neuer Ort"-Slot klicken um React-Select zu fokussieren
         try:
@@ -365,14 +367,12 @@ async def _enter_geo(tab, geo_query: str, expected_substring: str) -> bool:
                     return true;
                 })()"""
             )
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(2.0)
         except Exception:
             pass
 
-        # 3) React-Select-Input via direkter ID
-        # Tippen einzeln pro Zeichen, damit Autocomplete-API getriggert wird
+        # 3) React-Select-Input mit grosszuegigen Delays zwischen Chars
         try:
-            # Selektor: dynamischer react-select-X-input
             inp = await tab.query_selector(
                 'input[id^="react-select-"][id$="-input"]'
             )
@@ -381,18 +381,18 @@ async def _enter_geo(tab, geo_query: str, expected_substring: str) -> bool:
                       file=sys.stderr, flush=True)
                 return False
             await inp.click()
-            await asyncio.sleep(0.4)
-            # Eingabe ueber send_keys (Native Tastatur-Events fuer React)
+            await asyncio.sleep(1.0)
+            # CHAR-BY-CHAR mit 0.3s Delay (Server-API muss antworten)
             for ch in geo_query:
                 await inp.send_keys(ch)
-                await asyncio.sleep(0.06)
+                await asyncio.sleep(0.3)
         except Exception as e:
             print(f">>>   Input-Tippen FAIL: {e}",
                   file=sys.stderr, flush=True)
             return False
 
-        # 4) Autocomplete-Suggestions warten
-        await asyncio.sleep(2.5)
+        # 4) Autocomplete-Suggestions voll laden lassen (Server-Response)
+        await asyncio.sleep(4.0)
 
         # 5) Erste passende Suggestion picken via NATIVE Click
         # React-Select reagiert auf echte Browser-Mouse-Events.
@@ -451,7 +451,7 @@ async def _enter_geo(tab, geo_query: str, expected_substring: str) -> bool:
             except Exception:
                 pass
 
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(3.0)  # warten dass Tag im DOM erscheint
 
         # Verifikation via Body-Text
         body = await tab.evaluate(
@@ -652,6 +652,83 @@ async def _save_screenshot(tab, label: str, ts: str) -> Optional[Path]:
         return None
 
 
+async def _verify_radio_checked(tab, radio_id: str) -> bool:
+    try:
+        r = await tab.evaluate(
+            f"""(() => {{
+                const r = document.getElementById({json.dumps(radio_id)});
+                return r ? !!r.checked : false;
+            }})()"""
+        )
+        if isinstance(r, dict) and "value" in r:
+            r = r["value"]
+        return bool(r)
+    except Exception:
+        return False
+
+
+async def _verify_mfh_checked(tab) -> bool:
+    try:
+        r = await tab.evaluate(
+            """(() => {
+                const cbs = Array.from(document.querySelectorAll('input[type="checkbox"]'));
+                for (const cb of cbs) {
+                    const wrap = cb.parentElement ? cb.parentElement.innerText.trim() : '';
+                    if (wrap.includes('Mehrfamilienhaus')) return !!cb.checked;
+                }
+                return false;
+            })()"""
+        )
+        if isinstance(r, dict) and "value" in r:
+            r = r["value"]
+        return bool(r)
+    except Exception:
+        return False
+
+
+async def _verify_geo_set(tab, expected_substring: str) -> Optional[str]:
+    try:
+        body = await _get_dom_body(tab)
+        geo = parse_geo_state(body)
+        if geo and expected_substring.lower() in geo.lower() and geo != "Neuer Ort":
+            return geo
+        return None
+    except Exception:
+        return None
+
+
+async def _wait_for_radio(tab, radio_id: str, timeout_s: float = 6.0) -> bool:
+    import time
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if await _verify_radio_checked(tab, radio_id):
+            return True
+        await asyncio.sleep(0.4)
+    return False
+
+
+async def _wait_for_mfh(tab, want_checked: bool, timeout_s: float = 6.0) -> bool:
+    import time
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        cur = await _verify_mfh_checked(tab)
+        if cur == want_checked:
+            return True
+        await asyncio.sleep(0.4)
+    return False
+
+
+async def _wait_for_geo(tab, expected_substring: str, timeout_s: float = 6.0) -> Optional[str]:
+    import time
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        geo = await _verify_geo_set(tab, expected_substring)
+        if geo:
+            return geo
+        await asyncio.sleep(0.4)
+    return None
+
+
 async def _run_one_config(
     tab,
     *,
@@ -663,47 +740,69 @@ async def _run_one_config(
     label: str,
     ts: str,
 ) -> dict:
-    """Setzt Filter und liefert geparsten Stat-Block."""
+    """Setzt Filter und liefert geparsten Stat-Block.
+
+    Mit grosszuegigen Wait-Zeiten und Verifikation pro Schritt — die App
+    ist langsam (Server-State + React-Render + IntercoolerJS-AJAX).
+    """
+    radio_id = _RADIO_IDS[radio]
+
     # Page laden (resetted Filter-State)
     await tab.get(URL_STATISTICS)
-    await asyncio.sleep(3.5)
+    await asyncio.sleep(6.0)  # generoeses Hydration-Wait
 
     # Period waehlen
     await _select_period(tab, year_half)
-    await asyncio.sleep(1.0)
+    await asyncio.sleep(2.0)
 
-    # Radio
+    # Radio + Verifikation
     await _select_radio(tab, radio)
-    await asyncio.sleep(0.8)
+    radio_ok = await _wait_for_radio(tab, radio_id, timeout_s=6.0)
+    print(f">>>   Radio {radio!r} checked: {radio_ok}",
+          file=sys.stderr, flush=True)
+    if not radio_ok:
+        # Retry mit nochmals klick
+        await _select_radio(tab, radio)
+        radio_ok = await _wait_for_radio(tab, radio_id, timeout_s=4.0)
+        print(f">>>   Radio retry: {radio_ok}",
+              file=sys.stderr, flush=True)
+    await asyncio.sleep(1.5)
 
-    # Bauliches-Tab oeffnen + MFH-Checkbox passend setzen (sicher in beiden Faellen)
+    # GEO VOR Bauliches setzen — React-Select Component sonst gestoert von
+    # Tab-Wechsel (Bauliches re-mounted das Component)
+    await _enter_geo(tab, geo_query, geo_expected)
+    await asyncio.sleep(3.0)
+    geo_state = await _wait_for_geo(tab, geo_expected, timeout_s=8.0)
+    print(f">>>   Geo nach React-Select: state={geo_state!r}",
+          file=sys.stderr, flush=True)
+    if not geo_state:
+        # Retry
+        print(">>>   Geo retry...", file=sys.stderr, flush=True)
+        await _enter_geo(tab, geo_query, geo_expected)
+        await asyncio.sleep(3.0)
+        geo_state = await _wait_for_geo(tab, geo_expected, timeout_s=8.0)
+        print(f">>>   Geo nach retry: state={geo_state!r}",
+              file=sys.stderr, flush=True)
+
+    # Bauliches-Tab oeffnen + MFH-Checkbox passend setzen (NACH Geo!)
     await _click_bauliches_tab(tab)
-    await asyncio.sleep(0.8)
+    await asyncio.sleep(2.0)
     if mfh:
         await _click_mfh_checkbox(tab)
     else:
-        # Sticky-MFH von vorigem Run sicher entfernen
         await _uncheck_mfh_checkbox(tab)
-    await asyncio.sleep(0.6)
-    # Zurueck zum Start-Tab fuer Ort-Eingabe
-    try:
-        await tab.evaluate(
-            """(() => {
-                const tabs = Array.from(document.querySelectorAll('a, button'))
-                    .filter(b => b.innerText.trim() === 'Start');
-                if (tabs.length > 0) tabs[0].click();
-            })()"""
-        )
-        await asyncio.sleep(0.6)
-    except Exception:
-        pass
-
-    # Ort (PLZ oder Stadt) — primaer via API, fallback React-Select
-    geo_ok, picked_loc = await _set_geo_via_api(tab, geo_query, geo_expected)
-    if not geo_ok:
-        print(">>>   API-Geo failed, fallback React-Select",
+    mfh_ok = await _wait_for_mfh(tab, mfh, timeout_s=6.0)
+    print(f">>>   MFH-Checkbox = {mfh}: {mfh_ok}",
+          file=sys.stderr, flush=True)
+    if not mfh_ok:
+        if mfh:
+            await _click_mfh_checkbox(tab)
+        else:
+            await _uncheck_mfh_checkbox(tab)
+        mfh_ok = await _wait_for_mfh(tab, mfh, timeout_s=4.0)
+        print(f">>>   MFH retry: {mfh_ok}",
               file=sys.stderr, flush=True)
-        geo_ok = await _enter_geo(tab, geo_query, geo_expected)
+    await asyncio.sleep(1.5)
 
     # Statistik erstellen
     submitted = await _click_create_stat(tab)
@@ -711,15 +810,16 @@ async def _run_one_config(
         return {
             "status": "error",
             "error": "submit_button_not_found",
-            "geo_ok": geo_ok,
+            "geo_ok": bool(geo_state),
             "uebersicht": None,
             "zusatzinfo": None,
         }
 
-    # Warten + DOM lesen
-    loaded = await _wait_for_stat_loaded(tab, timeout_s=15.0)
+    # Warten auf neue Stat (15s wegen Server-Render)
+    loaded = await _wait_for_stat_loaded(tab, timeout_s=20.0)
+    await asyncio.sleep(1.5)  # extra fuer final DOM-Settle
     body = await _get_dom_body(tab)
-    geo_state = parse_geo_state(body)
+    geo_state_final = parse_geo_state(body)
     parsed = parse_stat_block(body)
 
     # Screenshot zur Verifikation
@@ -727,8 +827,10 @@ async def _run_one_config(
 
     return {
         "status": "ok" if loaded and parsed.get("uebersicht") else "partial",
-        "geo_ok": geo_ok,
-        "geo_state": geo_state,
+        "geo_ok": bool(geo_state),
+        "geo_state": geo_state_final,
+        "radio_checked": radio_ok,
+        "mfh_checked": mfh_ok,
         "uebersicht": parsed.get("uebersicht"),
         "zusatzinfo": parsed.get("zusatzinfo"),
         "screenshot": str(shot) if shot else None,

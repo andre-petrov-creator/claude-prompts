@@ -128,27 +128,38 @@ Renditen).
 
 ### Filter-Autonomie (Phase 2 TODO)
 
-**Aktueller Stand:** Der Adapter ruft korrekt die `/de/api/location` API
-auf, holt die Location-ID, und setzt das hidden Form-Input `id_location`.
-**Aber:** Die UI ist React-basiert (React-Select fuer Ort, custom-control
-fuer Object-Typ-Radio), und der serverseitige Filter-State wird beim
-Submit aus dem React-Component-Tree gelesen, nicht aus dem hidden Input.
+**Status nach Iteration mit groesseren Sleep-Zeiten + Verifikation:**
 
-Konsequenz: **Alle 4 Configs liefern denselben Wert** — naemlich den
-zuletzt manuell gesetzten Filter-State.
+| Filter | Status |
+|---|---|
+| Halbjahr (z.B. H1/2026) | ✅ autonom |
+| Object-Typ-Radio (ETW/Mietwohnung/Hauskauf) | ✅ autonom (mit Verifikation + Retry) |
+| Bauliches: MFH-Checkbox an/aus | ✅ autonom (mit Verifikation + Retry) |
+| Ort (PLZ / Stadt) via React-Select | ⚠️ Probe isoliert OK, im Adapter nicht zuverlaessig |
 
-Workaround fuer jetzt: Vor dem ersten autonomen Adapter-Run muss der
-User **einmal manuell** die Filter im Browser setzen
-(via `inspectors/training_immometrica.py`). Der Sticky-State wird
-serverseitig gespeichert und vom Adapter genutzt.
+**Geo-Limitation:** Das isolierte Probe-Skript
+`inspectors/probe_geo_input.py` setzt den Ort-Tag erfolgreich
+(`'45357 Essen'` im DOM). Im Adapter-Kontext mit `tab.get(URL_STATISTICS)`
+zwischen Configs greift dieselbe Sequenz nicht — vermutlich weil React-
+Select bei Page-Reload neu gemounted wird und Component-Internals
+inkonsistent sind. Detail-Debug nicht abgeschlossen.
+
+**Workaround:** User setzt den Geo-Filter EINMAL manuell via
+`inspectors/training_immometrica.py`. Der Sticky-State wird serverseitig
+gespeichert. Der Adapter ruft danach alle 4 Configs auf — Period + Radio +
+MFH werden autonom umgeschaltet, Geo bleibt der Sticky-Wert. Fuer
+verschiedene Adressen mit unterschiedlichen PLZ muss der User Geo
+zwischendurch wechseln.
 
 **Phase 2 — Loesungs-Optionen:**
-1. **Direct-POST an IntercoolerJS-Endpoint:** `/de/statistics` mit Query-
+1. **Page.reload() statt tab.get():** Behaelt JS-Engine-State, evtl. besseres
+   React-Select-Behavior.
+2. **Direct-POST an IntercoolerJS-Endpoint:** `/de/statistics` mit Query-
    Params + CSRF-Token. Format aus dem Network-Log reverse-engineeren.
-2. **CDP Input.dispatchKeyEvent:** Echte Tastatur-Events statt
-   synthesized fuer React-Select.
-3. **Klick auf serverseitig vor-gerenderte Suggestions:** Nicht React-
-   gefilterte Suggestions, sondern Original-Server-Liste.
+3. **CDP Input.dispatchKeyEvent:** Echte Tastatur-Events statt
+   send_keys fuer React-Select.
+4. **Adapter ohne Page-Reload:** Alle 4 Configs auf derselben Page-Session
+   ablaufen, Filter zwischen Configs DOM-aenderung statt Reload.
 
 ### reCAPTCHA bei Login-Refresh
 
