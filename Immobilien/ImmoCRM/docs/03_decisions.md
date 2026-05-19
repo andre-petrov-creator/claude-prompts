@@ -816,11 +816,19 @@ Lokaler PowerShell-Watcher (Windows Task Scheduler mit `At log on` + `Every 1 mi
 
 **Technischer Beweis Skill-Run (2026-05-15 14:04):** Skill hat aus echter Test-Mail Adresse, Baujahr, WE-Zahl, Wohnfläche, Angebotspreis, Maklerin-Daten korrekt extrahiert. MD5-Match-Erkennung gegen existierenden Aufteiler-Ordner funktioniert.
 
+**Erledigt am 2026-05-19 (Phase 1.5 — Duplikat-Handling):**
+
+- ✓ **Migration 017** `mail_queue.note text` für Duplikat-Marker und sonstige Hinweise (commit folgt). Saubere Spalte statt error_msg-Missbrauch.
+- ✓ **Skill Abschnitt 0.2 erweitert** um autonomen MD5-Duplikat-Check (Schritt A.5 zwischen Inputs-Laden und Datensatz-Extraktion). Bei Match wird der Mail-Ordner als `_mail_<YYYY-MM-DD>_<msg-id-short>/` in den existierenden Objekt-Ordner einsortiert, `mail_queue.status='done'` + `note='duplicate of <slug>'`, kein Duplikat-Lead, Skill exittet sauber. Bei kein Match: normaler Pfad mit Lead-Insert. `claude --print` ist nicht-interaktiv → Skill entscheidet autonom, keine `AskUserQuestion`.
+- ✓ **Live verifiziert** mit Prosperstr-Test-Trigger: 2 von 2 PDFs als MD5-Match erkannt, Mail einsortiert nach `Objekte/Prosperstr., 45357 Essen-Dellwig/_mail_2026-05-19_064401dc/`, mail_queue korrekt aktualisiert, Audit-Eintrag in `quickcheck-log.md` geschrieben. Deal-ID-Lookup via `expose_local_path ilike` lieferte hier null (Prosperstr-Lead wurde nie ins ImmoCRM gepusht) — Skill fällt sauber auf "deal_id=null + note='duplicate of <slug>'" zurück.
+- ✓ **Slug-Filter:** Match-Pfade unter `Objekte/_<...>/` (Mail-Inbox-Artefakte aus Cloud-Bug) werden bei der Slug-Ableitung ignoriert.
+- ✓ **OneDrive-Pfad-Quelle:** Skill liest Basis-Pfad aus `$AKQUISE_OBJEKTE_PATH` (vom Watcher gesetzt), kein hardcodierter Fallback.
+
 **Noch offen für nächste Session / Phase 2:**
 
-1. **Duplikat-Handling im Akquise-Modus** — bei MD5-Match oder Adress-Match gegen existierenden `Objekte/<slug>/`-Ordner soll der Skill autonom entscheiden (z.B. Mail-Ordner als `_mail_<datum>_<msg-id>/` ins existierende Objekt einsortieren, kein Duplikat-Lead, mail_queue.status='done' mit Note). Aktuell fragt Skill *"Welche Option?"* — `claude --print` ist aber nicht-interaktiv → Skill exittet ohne Aktion.
-2. **Phase 2** (siehe Brainstorming-Prompt am Ende von `plans/2026-05-15-akquise-pipeline-local-watcher-final.md`): KI-Klassifikation der Anhänge, Bilder-/Unterlagen-Sub-Ordner, Link-Pipeline mit Playwright-Scraping (HTML-Exposé, Diashow-Bilder, Drucken-Button-PDF).
-3. **Echter Lead-Insert** mit nicht-Duplikat-Mail noch nicht live verifiziert (Test-Mail war Re-Forward des bekannten Prosperstr-Exposés). Wird beim nächsten echten Akquise-Mail-Eingang automatisch passieren.
+1. **Phase 2** (siehe Brainstorming-Prompt am Ende von `plans/2026-05-15-akquise-pipeline-local-watcher-final.md`): KI-Klassifikation der Anhänge, Bilder-/Unterlagen-Sub-Ordner, Link-Pipeline mit Playwright-Scraping (HTML-Exposé, Diashow-Bilder, Drucken-Button-PDF).
+2. **Echter Lead-Insert** mit nicht-Duplikat-Mail noch nicht live verifiziert. Wird beim nächsten echten Akquise-Mail-Eingang automatisch passieren.
+3. **Watcher-Log-Race:** Wenn parallel ein `tail -f` auf `watcher.log` läuft, kann PowerShell `Add-Content` mit IOException scheitern → Watcher exittet mit Code 1, `.processing` bleibt im Mail-Ordner liegen (Skill selbst ist erfolgreich durchgelaufen). Im normalen Task-Scheduler-Betrieb (ohne Monitor) tritt das nicht auf. Falls relevant: PowerShell-Logging auf Mutex/Retry umstellen.
 
 ### Referenzen
 

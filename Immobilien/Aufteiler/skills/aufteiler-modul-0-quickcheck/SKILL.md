@@ -38,6 +38,74 @@ Wenn unsicher: **Akquise-Modus annehmen falls Ordnerpfad gegeben, sonst Orchestr
 4. Pro PDF: `Read` aufrufen oder PDF-Skill nutzen → Textinhalt.
 5. Falls `body.txt` im Ordner liegt: einlesen — enthält den Mail-Body-Text als sekundäre Quelle.
 
+**A.5 Duplikat-Check (autonom, vor LLM-Extraktion)**
+
+Pflicht-Schritt bevor irgendwelche LLM-Calls oder Inserts passieren. `claude --print` ist nicht-interaktiv → bei Match wird autonom entschieden, keine `AskUserQuestion`.
+
+1. **MD5-Hashes der eingegangenen PDFs berechnen** (Bash):
+   ```bash
+   cd "<folder>"
+   md5sum *.pdf 2>/dev/null
+   ```
+   Falls keine PDFs vorhanden: Schritt überspringen, weiter mit B.
+
+2. **Bestehende Objekt-Ordner scannen.** Basis-Pfad steht in `$AKQUISE_OBJEKTE_PATH` (vom Watcher aus `.env` gesetzt). Wenn die Env-Var fehlt: Skill setzt `note='duplicate handling skipped (AKQUISE_OBJEKTE_PATH missing)'`, läuft in normalen Pfad weiter — niemals mit hardcodiertem Fallback raten.
+   ```bash
+   find "$AKQUISE_OBJEKTE_PATH" -name "*.pdf" -type f 2>/dev/null | while read f; do md5sum "$f"; done
+   ```
+   Output: `<md5>  <pfad>`-Zeilen. Ordner-Namen mit Prefix `_` (Mail-Inbox-Artefakte, die aus Cloud-Bug im Objekte/ liegen) werden bei der Slug-Ableitung ignoriert — wenn Match-Pfad zu einem `_`-Slug zeigt, wird der Match übersprungen und der Lauf geht in normalen Pfad weiter.
+
+3. **Match-Vergleich.** Jeden eingegangenen MD5 gegen die Hash-Liste prüfen.
+   - **Kein Match** → weiter mit Schritt B (normaler Pfad).
+   - **Mindestens ein Match** → Duplikat-Pfad:
+
+   a. Existing-Slug aus Match-Pfad ableiten — der letzte Verzeichnisname unter `Objekte/` ist der Slug.
+      ```
+      <onedrive>/Immobilien/001_AQUISE/Objekte/welperstr-39-hattingen/Exposé.pdf
+      → existing_slug = "welperstr-39-hattingen"
+      ```
+
+   b. Mail-Ordner-Inhalt verschieben nach `<onedrive>/Immobilien/001_AQUISE/Objekte/<existing_slug>/_mail_<YYYY-MM-DD>_<msg-id-short>/`.
+      - `<YYYY-MM-DD>` = heutiges Datum
+      - `<msg-id-short>` = erste 8 Zeichen der sanitized Message-ID (aus Ordnername des `_inbox`-Folders)
+      - Move via Bash `mv` oder PowerShell `Move-Item`. Alle Files inkl. `.trigger`, `_meta.json`, `body.txt`, PDFs.
+
+   c. **`deal_id` für existing slug nachschlagen** (REST):
+      ```
+      GET /rest/v1/deals?expose_local_path=ilike.*<existing_slug>*&select=id&deleted_at=is.null&limit=1
+      ```
+      Bei Treffer: `existing_deal_id = result[0].id`. Bei kein Treffer: `existing_deal_id = null`.
+
+   d. **`mail_queue` updaten** (REST):
+      ```
+      PATCH /rest/v1/mail_queue?message_id=eq.<msg-id>
+      Body: {
+        "status": "done",
+        "done_at": "<jetzt ISO>",
+        "deal_id": <existing_deal_id-or-null>,
+        "note": "duplicate of <existing_slug>"
+      }
+      ```
+
+   e. **Audit-Spur in existing Objekt-Ordner.** Datei `<onedrive>/.../Objekte/<existing_slug>/quickcheck-log.md` anhängen (oder erstellen):
+      ```markdown
+
+      ## Duplikat-Mail <YYYY-MM-DD HH:MM>
+      - Eingegangen von: <from aus _meta.json>
+      - Subject: <subject>
+      - Message-ID: <message_id>
+      - Match-PDFs: <liste der MD5-Match-Dateinamen>
+      - Mail-Ordner einsortiert nach: `_mail_<YYYY-MM-DD>_<msg-id-short>/`
+      ```
+
+   f. **Skill-Output (Übergabe):**
+      ```
+      Modul 0 (Akquise-Modus, Duplikat). Match: <existing_slug>. Deal-ID: <existing_deal_id-or-"unknown">. Mail einsortiert nach Objekte/<existing_slug>/_mail_<YYYY-MM-DD>_<msg-id-short>/. mail_queue=done, note='duplicate of <existing_slug>'.
+      ```
+      **Skill exittet hier** — kein neuer Lead, kein Ordner-Rename, keine Schritte B–L.
+
+Bei Fehler im Duplikat-Pfad (Move scheitert, REST 4xx/5xx): `mail_queue.status='error'`, `error_msg=<msg>`, `note='duplicate handling failed for <existing_slug>'`, Skill mit non-zero exit beenden — Watcher protokolliert.
+
 **Adress-Priorisierung (sehr wichtig — gegen False-Positives):**
 
 - Objektadresse kommt **PRIMÄR** aus dem Exposé-PDF.
