@@ -2,3 +2,5 @@ playwright>=1.40
 pytest>=7.0
 anthropic>=0.40
 python-dotenv>=1.0
+# Immometrica-Adapter (Anti-Detect Chrome via CDP)
+nodriver>=0.50

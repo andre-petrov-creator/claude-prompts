@@ -22,6 +22,9 @@ tools/portal-bewertung/runs/*.html
 !tools/portal-bewertung/runs/.gitkeep
 tools/portal-bewertung/learned_selectors/*.json
 !tools/portal-bewertung/learned_selectors/.gitkeep
+# Immometrica Browser-User-Data (Cookies, Session)
+tools/portal-bewertung/learned_selectors/immometrica_nodriver_userdata/
+tools/portal-bewertung/learned_selectors/immometrica_userdata/
 tools/portal-bewertung/inspectors/*.json
 tools/portal-bewertung/inspectors/*.html
 tools/portal-bewertung/__pycache__/

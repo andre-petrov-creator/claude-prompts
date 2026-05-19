@@ -55,6 +55,11 @@ PORTAL_REGISTRY: dict[str, type[PortalBase]] = {
     "interhyp": InterhypPortal,
 }
 
+# Special-Case: Immometrica nutzt nodriver (Anti-Detect), nicht PortalBase.
+# Registry-Eintrag nur fuer CLI-Validation; Dispatch erfolgt separat.
+IMMOMETRICA_NAME = "immometrica"
+PORTAL_CHOICES = sorted(set(list(PORTAL_REGISTRY.keys()) + [IMMOMETRICA_NAME]))
+
 
 def _csv_floats(s: str) -> list[float]:
     return [float(x.strip()) for x in s.split(",") if x.strip()]
@@ -68,7 +73,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument(
         "--portal",
         required=True,
-        choices=sorted(PORTAL_REGISTRY.keys()),
+        choices=PORTAL_CHOICES,
         help="Welches Portal abrufen.",
     )
 
@@ -177,6 +182,20 @@ def main(argv: list[str]) -> int:
         d = _load_datensatz_from_json(args.datensatz)
     else:
         d = _build_datensatz_from_args(args)
+
+    # Special-Case: Immometrica via nodriver
+    if args.portal == IMMOMETRICA_NAME:
+        from portals.immometrica.portal import run_immometrica  # noqa: E402
+
+        out = run_immometrica(
+            plz=str(d.plz),
+            stadt=str(d.ort),
+            year_half="H1/2026",
+            headless=args.headless,
+        )
+        out["generalisierter_datensatz"] = asdict(d)
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out.get("status") in ("ok", "partial") else 1
 
     portal_cls = PORTAL_REGISTRY[args.portal]
     portal = portal_cls()

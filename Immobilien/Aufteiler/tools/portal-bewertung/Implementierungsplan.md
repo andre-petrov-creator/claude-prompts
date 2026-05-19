@@ -26,7 +26,7 @@
 | 11 ⏳ | LLM-Recovery: `core/llm_recovery.py` + `core/selectors_store.py` | Module fertig + 10 Tests, Runner-Auto-Integration + Live-Bruchprobe offen | 8 |
 | 12 ⏳ | Neues Portal: Homeday Preisatlas | Adapter fertig + 26 Tests; Live-Lauf-Verifikation durch User offen | 10, 11 |
 | 13 ⏳ | Neues Portal: Interhyp | Adapter fertig (Marktwert + €/m² je Ausstattung, keine Trend-Auswertung) + Tests + Live-Lauf; semantische User-Plausibilitätsprüfung offen | 12 |
-| 14 | Neues Portal: Immometrica (statt IS24) | Paid-B2B-Portal mit Login, liefert Marktwert + Miete + Rendite + Marktstatistik | 13 |
+| 14 ⏳ | Neues Portal: Immometrica (statt IS24) | Login + Stat-Parser fertig, Filter-Autonomie partial (Phase-2-TODO) | 13 |
 | 15 | Orchestrator + `--alle` Modus | Parallel-Aufruf, Konsens-Median | 14 |
 | 16 | Modul-0-Integration | Aufteiler-Skill ruft Portal-Bewertung, State-Update | 15 |
 | 17 | Modul-5-PDF-Integration | Portal-Werte im PDF-Report | 16 |
@@ -472,18 +472,22 @@ Usercentrics-CMP-Bypass via `#usercentrics-root.remove()` funktioniert). Aber:
   (`IMMOMETRICA_USERNAME` + `IMMOMETRICA_PASSWORD` — vorhanden, Stand 2026-05-19)
 
 **Akzeptanzkriterium:**
-- [ ] `portals/immometrica/` analog Interhyp/Homeday
-- [ ] Login-Flow funktioniert (2-Step-Login möglich, siehe HANDOVER)
-- [ ] Adress-Suche liefert Marktwert + €/m² + Miete + Rendite via Network-Sniffer
-  ODER offizielle API
-- [ ] Daten landen im `RunResult.extra`-Slot:
-  `marktwert_eur_mittel`, `eur_per_qm`, `miete_eur_mittel`, `miete_eur_per_qm`,
-  `rendite_brutto_pct`, `mietprognose_pct_6m`, `marktangebote_kauf`, `marktangebote_miete`
-- [ ] Adress-Validierungs-Loop auf Result-Seite
-  (Memory: [[immoscout24-adresse-validierung]] — gilt analog)
-- [ ] PORTAL_REGISTRY um `immometrica` erweitert
-- [ ] Live-Lauf gegen echte Site → Werte plausibilisiert vs. Aufteiler-Standardcase
-  Prosperstr. 59 (Erwartung Marktwert 150k-220k, Miete ~700 €, Rendite ~5%)
+- [x] `portals/immometrica/` mit `parsers.py` + `portal.py` (nutzt nodriver statt PortalBase)
+- [x] Login-Flow funktioniert vollautonom (nodriver + Stealth-Patches umgehen reCAPTCHA)
+- [x] Persistent User-Data-Dir unter `learned_selectors/immometrica_nodriver_userdata/`
+- [x] Statistik-Werte werden aus DOM extrahiert: Anzahl Angebote, Median Preis/m²,
+  Median Onlinezeit, Rendite (Kauf + Miete je in Übersicht + Zusatzinfo)
+- [x] 15 Parser-Unit-Tests grün (inkl. 2 mit echten Live-DOM-Dumps)
+- [x] PORTAL_REGISTRY erweitert: `m00_portal_pricer.py --portal immometrica`
+- [x] Live-Smoke-Test grün: Login + 4 Configs durchlaufen, alle status=ok
+- [x] docs/portal-immometrica.md mit Architektur + Limitierungen
+- [ ] **Phase 2 (offen):** Filter-Autonomie (Geo + Object-Typ + MFH).
+  React-Select + custom-control-Radios ignorieren synth events;
+  Direct-POST an IntercoolerJS-Endpoint nötig. Aktueller Workaround:
+  User muss vor dem Run einmal manuell die Filter setzen, Sticky-State
+  wird wiederverwendet.
+- [ ] **Phase 2 (offen):** Adress-Validierungs-Loop (gilt fuer Stat-Adapter nur
+  bedingt, weil keine Objekt-Detail-View)
 
 **Edge-Cases:**
 - Login-Form ist 2-Step (Email zuerst, dann Passwort auf separater Seite) — Probe
