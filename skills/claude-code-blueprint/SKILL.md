@@ -1,6 +1,6 @@
 ---
 name: claude-code-blueprint
-description: Use this skill whenever the user wants to start a new coding project with Claude Code, plan an MVP, build an "Implementierungsplan", set up CLAUDE.md and /docs structure, or asks how to structure prompts for Claude Code in the terminal. Trigger this for any phrase like "neues Projekt mit Claude Code", "Projekt planen", "Implementierungsplan", "MVP bauen", "Prompts für Claude Code", "Claude Code Setup", "wie gehe ich an X ran", or any time the user mentions building software with Claude Code and needs structure. Also trigger when the user has a vague coding idea and says "lass uns sparren" or "lass uns planen". The skill produces two artifacts (Projektbeschreibung + Implementierungsplan) and walks through prompt-per-step execution with Claude Code.
+description: Use this skill whenever the user wants to start a new coding project with Claude Code, plan an MVP, build an "Implementierungsplan", set up CLAUDE.md and /docs structure, or asks how to structure prompts for Claude Code in the terminal. Trigger this for any phrase like "neues Projekt mit Claude Code", "Projekt planen", "Implementierungsplan", "MVP bauen", "Prompts für Claude Code", "Claude Code Setup", "wie gehe ich an X ran", or any time the user mentions building software with Claude Code and needs structure. Also trigger when the user has a vague coding idea and says "lass uns sparren" or "lass uns planen". Trigger zusätzlich bei "Session beenden", "Handoff", "Übergabe", "handoff.md", "Context Rot", "Claude vergisst", "Claude dreht sich im Kreis", "/compact reicht nicht". The skill produces two artifacts (Projektbeschreibung + Implementierungsplan) und walks through prompt-per-step execution with Claude Code — inkl. sauberem Session-Handoff via handoff.md zwischen jedem Schritt im Implementierungsplan.
 ---
 
 # Claude Code Blueprint
@@ -15,6 +15,8 @@ Zwei-Ebenen-Setup mit klarer Trennung:
 - **Claude Code (Terminal)**: Ausführung Schritt für Schritt
 
 Output von Web-Claude wird zu Input für Claude Code. Persistenter Kontext läuft über Dateien im Projekt-Repo, nicht über Chat-History.
+
+Zwischen Schritten im Implementierungsplan **immer ein bewusstes Session-Handoff via `handoff.md`** (Phase 5) — nicht auf `/compact` verlassen. Das ist der zentrale Mechanismus gegen Context Rot.
 
 ## Wann diesen Workflow nutzen
 
@@ -89,6 +91,7 @@ Am Ende der Sparring-Session liefert Claude:
 - Schritt 2: Auth/Basis-Setup
 - Schritt 3 bis N: Feature für Feature
 - Pro Schritt: Ziel, betroffene Dateien, Akzeptanzkriterium, abhängige Schritte
+- **Zwischen jedem Schritt: Session-Handoff via `handoff.md` (Phase 5).** Im Plan-Header einmal festhalten, dass diese Regel pro Schritt gilt, statt sie pro Schritt zu wiederholen.
 
 Beide Files als Knowledge-Files im Claude-Projekt hinterlegen. Diese sind ab jetzt der gemeinsame Kontext für alle weiteren Chats.
 
@@ -211,7 +214,10 @@ Nach erfolgreichem Schritt:
 - /docs prüfen, wurde aktualisiert?
 - Akzeptanzkriterium manuell testen
 - Implementierungsplan im Web-Claude markieren (Schritt N erledigt)
-- Nächster Schritt
+- **`handoff.md` schreiben lassen (Phase 5)** — bevor `/clear` oder neue Session
+- Nächster Schritt startet in neuer Session mit "Lies `handoff.md` und mach genau dort weiter."
+
+Zwischen je zwei Schritten im Implementierungsplan gehört **immer** ein Handoff. Niemals einen Schritt im selben überladenen Kontext-Fenster wie den vorherigen starten — sonst trägst du Sackgassen, falsche Annahmen und Rauschen in den nächsten Schritt.
 
 ## Phase 4: Doku-Pflege
 
@@ -240,6 +246,103 @@ Struktur pro Feature-Doku:
 
 Bei jedem neuen Feature: neue Datei. Bei Änderung: bestehende Datei updaten. Diese Files macht Claude Code beim nächsten Prompt zum Kontext.
 
+## Phase 5: Session-Handoff mit handoff.md
+
+Der zentrale Mechanismus zwischen zwei Schritten im Implementierungsplan und gegen Context Rot. Pflicht zwischen jedem Schritt — nicht erst bei Chaos.
+
+### Das Problem: Context Rot
+
+Claude Code hält die gesamte Konversation im Kontext-Fenster. Jeder Tool-Aufruf, jeder Fehlversuch, jede falsche Annahme wandert rein und bleibt drin. Nach 2+ Stunden verteilt sich die Aufmerksamkeit des Modells auf abgebrochene Debugging-Versuche, veraltete Dateistände und Holzwege. Das Modell wird nicht dümmer — es erstickt am eigenen Verlauf. Besonders im letzten Fünftel des Kontext-Fensters lässt die Zuverlässigkeit messbar nach.
+
+### Warum /compact nicht reicht
+
+`/compact` fasst zusammen, was da ist — inklusive der falschen Annahmen, der Sackgassen und des überholten Framings. Eine Zusammenfassung vom Chaos ist immer noch Chaos. Diese Fehler überleben die Komprimierung, nur kleiner verpackt. Du schleppst denselben Ballast weiter.
+
+`/compact` ist ein Notnagel, kein Übergabe-Mechanismus.
+
+### Der Fix: Du kuratierst, nicht die Maschine
+
+Statt die überladene Session weiterzuschleppen, machst du einen sauberen Schnitt:
+
+1. **Vor** `/clear` oder Session-Ende: Claude Code schreibt `handoff.md` (Prompt unten).
+2. Neue Session oder `/clear`.
+3. Erster Prompt der neuen Session: *"Lies `handoff.md` und mach genau dort weiter."*
+
+Du gibst nicht demselben überladenen Agenten noch eine Chance. Du gibst einem frischen Agenten einen sauberen Start — mit genau dem Kontext, der zählt, und nichts sonst.
+
+### Die sechs Blöcke von handoff.md
+
+Lass keinen weg — besonders nicht Block 5.
+
+1. **Ziel** — Was soll am Ende gebaut sein? 1–2 Sätze.
+2. **Aktueller Stand** — Wo steht es konkret? Was läuft, was nicht?
+3. **Files in Arbeit** — Volle Pfade der Dateien an denen gearbeitet wird.
+4. **Geändert seit Start** — Entscheidungen, Scope-Shifts, verworfene Ansätze.
+5. **Was gescheitert ist** ⚠ — Konkrete Ansätze die NICHT funktioniert haben, mit Grund. Verhindert, dass der frische Agent dieselbe Sackgasse nochmal läuft. **Wichtigster Block, wird am häufigsten vergessen.**
+6. **Nächster Schritt** — Der eine konkrete nächste Task. Einer, nicht fünf.
+
+### Copy-Paste: Handoff-Prompt (Session-Ende)
+
+Diesen Text an Claude Code schicken, bevor die Session beendet wird:
+
+```
+Bevor wir hier aufhören: Schreib mir ein handoff.md ins Projekt-Root. Struktur:
+
+## Ziel
+[Was am Ende gebaut sein soll, 1-2 Sätze]
+
+## Aktueller Stand
+[Was konkret schon funktioniert, was nicht]
+
+## Files in Arbeit
+[Volle Pfade der Dateien an denen wir arbeiten]
+
+## Geändert seit Start
+[Entscheidungen, Scope-Shifts, verworfene Ansätze]
+
+## Was gescheitert ist
+[Konkrete Ansätze die NICHT funktioniert haben — mit Grund]
+
+## Nächster Schritt
+[Der eine konkrete nächste Task]
+
+Sei brutal ehrlich beim Stand und bei den Fehlversuchen — beschönige nichts.
+```
+
+Template als Skelett liegt unter `templates/handoff.md` im Skill-Ordner.
+
+### Copy-Paste: Resume-Prompt (neue Session)
+
+Erster Prompt in der neuen Session / nach `/clear`:
+
+```
+Lies handoff.md im Projekt-Root und mach genau dort weiter.
+Halte dich strikt an "Nächster Schritt" — keine eigenen Scope-Erweiterungen.
+Wenn etwas aus "Was gescheitert ist" nochmal naheliegend wirkt: erst rückfragen.
+```
+
+### Wann ein Handoff Pflicht ist
+
+Vier Situationen, dazu die Blueprint-Regel:
+
+- **Zwischen je zwei Schritten im Implementierungsplan** — Blueprint-Standard, nicht optional.
+- **Pause einlegen** — vor jeder Unterbrechung > 1 Stunde.
+- **Schleife erkannt** — wenn Claude denselben kaputten Fix dreimal bringt: sofort Handoff. Klarstes Signal für Context Rot.
+- **Vor großem Refactor / Feature-Block** — sauberer Kontext = besseres Reasoning genau dann, wenn du es brauchst.
+- **Tagesende** — morgen früh mit klarem Kopf, nicht mit dem Müll von gestern Abend.
+
+Profi-Regel: Handoff an einer logischen Grenze schlägt eines im Notfall. Nicht warten bis es kracht.
+
+### Was die Technik kaputt macht
+
+Ein Handoff ist nur so gut wie deine Ehrlichkeit über den echten Stand. Geschöntes Handoff ("läuft alles super, fast fertig") vererbt dem nächsten Agenten dieselben falschen Annahmen wie `/compact` — nur in Markdown verpackt. Deshalb steht im Prompt ausdrücklich *"sei brutal ehrlich"*. Der Wert liegt nicht im Dokument, sondern in der bewussten, ehrlichen Kuration. Genau das kann eine automatische Komprimierung nicht.
+
+### Versionierung & Archiv
+
+- `handoff.md` lebt im Projekt-Root und wird **überschrieben** bei jedem neuen Handoff (kein Sammelsurium).
+- Wer Historie braucht: vor dem Überschreiben nach `/docs/handoffs/handoff-YYYY-MM-DD-HHMM.md` archivieren.
+- `handoff.md` darf **nicht** im `.gitignore` stehen — sie ist Teil des Übergabe-Kontexts und wird mit committet, damit auch eine frische Cloud-Session (claude.ai/code) sie liest.
+
 ## Anti-Patterns
 
 Häufige Fehler und Gegenmaßnahmen:
@@ -259,6 +362,15 @@ Doppelte Arbeit, divergierende Lösungen. Web-Claude plant, Claude Code baut. Tr
 **Keine /docs-Updates**
 Nach drei Features ist der Kontext verloren, jeder neue Prompt muss alles erklären. Doku-Pflicht durchsetzen.
 
+**Auf `/compact` verlassen statt Handoff**
+`/compact` komprimiert das Chaos, statt es zu beseitigen — falsche Annahmen und Sackgassen überleben die Komprimierung. Zwischen Schritten **immer** `handoff.md` (Phase 5), `/compact` höchstens als Notnagel mitten in einem laufenden Schritt.
+
+**Geschöntes Handoff**
+"Läuft alles super, fast fertig" im `handoff.md` ist genauso wertlos wie `/compact` — vererbt dieselben falschen Annahmen. Block 5 ("Was gescheitert ist") brutal ehrlich füllen, sonst hat die Übergabe keinen Wert.
+
+**Im selben Kontext-Fenster den nächsten Schritt starten**
+Ohne `/clear` (oder neue Session) plus Handoff schleppst du Rauschen, Holzwege und veraltete Dateistände aus dem vorigen Schritt in den nächsten. Pro Schritt im Implementierungsplan ein frischer Claude-Code-Kontext.
+
 ## Templates zum Kopieren
 
 ### CLAUDE.md Vorlage
@@ -269,12 +381,23 @@ Nach drei Features ist der Kontext verloren, jeder neue Prompt muss alles erklä
 ## Vor jeder Aufgabe
 1. Lies DEVELOPMENT_GUIDELINES.md
 2. Lies relevante Dateien in /docs
-3. Referenziere installierte Skills: [Liste]
+3. Falls handoff.md im Projekt-Root existiert: zuerst lesen und Stand übernehmen
+4. Referenziere installierte Skills: [Liste]
 
 ## Nach jeder Aufgabe
 1. Aktualisiere oder erstelle /docs/[feature].md
 2. Halte Code-Style und Konventionen aus GUIDELINES ein
 3. Schreibe oder aktualisiere Tests wenn relevant
+
+## Vor Session-Ende / vor /clear / vor Schrittwechsel im Implementierungsplan
+Schreibe handoff.md ins Projekt-Root (Phase 5 aus claude-code-blueprint).
+Pflicht-Blöcke: Ziel · Aktueller Stand · Files in Arbeit · Geändert seit Start ·
+Was gescheitert ist · Nächster Schritt. Sei brutal ehrlich, beschönige nichts.
+Nicht auf /compact verlassen — handoff.md ist die Übergabe.
+
+## Beim Session-Start
+Falls handoff.md existiert: lies sie, fasse "Nächster Schritt" zurück an mich,
+warte auf "go". Keine eigenen Scope-Erweiterungen.
 
 ## Stack
 [Stack hier]

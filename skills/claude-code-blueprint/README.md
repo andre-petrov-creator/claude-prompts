@@ -13,7 +13,8 @@ Eingebunden in Claude Code via Junction unter `~/.claude/skills/claude-code-blue
 
 | Datei | Zweck |
 |---|---|
-| [`SKILL.md`](SKILL.md) | Skill-Definition (Phasen 1–4, Templates für CLAUDE.md / DEVELOPMENT_GUIDELINES.md) |
+| [`SKILL.md`](SKILL.md) | Skill-Definition (Phasen 1–5, Templates für CLAUDE.md / DEVELOPMENT_GUIDELINES.md, Session-Handoff via handoff.md) |
+| [`templates/handoff.md`](templates/handoff.md) | Skelett für das Session-Übergabe-Dokument (Phase 5). Wird ins Projekt-Root des jeweiligen Coding-Projekts kopiert und bei jedem Schrittwechsel überschrieben. |
 
 ## Junction neu anlegen (nach Recovery)
 
