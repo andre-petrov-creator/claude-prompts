@@ -20,6 +20,7 @@ GitHub-Spiegel zur Sicherung: `github.com/andre-petrov-creator/meine-projekte`
 | `commands/` | Custom Slash-Commands (Junction → `~/.claude/commands`) | aktiv |
 | `automatisierung-aquise/` | Python-Pipeline: Akquise-Mails → PDF/Adresse → Objekt-Ordner | aktiv |
 | `design/` | PDF-Templates (React-PDF) | aktiv |
+| `CLAUDE.md` | **Guidelines & Anweisungen** — projektübergreifende Regeln + MCP-Server-Doku (z. B. Higgsfield für Bild/Video/3D-Kamerafahrten) | aktiv |
 
 ## Skill-Junction-Pattern
 
